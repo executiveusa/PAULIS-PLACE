@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime, timezone
-from celery import shared_task
+from workers.celery_app import app
 from sqlalchemy.orm import Session
 from models.base import SessionLocal
 from models.task import Task, TaskType, TaskStatus
@@ -33,7 +33,7 @@ def create_task_record(db: Session, task_type: TaskType, input_data: dict = None
     return task
 
 
-@shared_task(bind=True, max_retries=3)
+@app.task(bind=True, max_retries=3)
 def scan_all_trends(self):
     """Scan all niches for trending keywords"""
     db = SessionLocal()
@@ -56,7 +56,7 @@ def scan_all_trends(self):
         raise self.retry(exc=e, countdown=60)
 
 
-@shared_task(bind=True)
+@app.task(bind=True)
 def score_hot_trends(self):
     """Score trends that have data but no opportunity score"""
     db = SessionLocal()
@@ -116,7 +116,7 @@ def score_hot_trends(self):
         raise
 
 
-@shared_task(bind=True)
+@app.task(bind=True)
 def research_all_niches(self):
     """Deep research on all configured niches"""
     db = SessionLocal()
@@ -145,7 +145,7 @@ def research_all_niches(self):
         raise
 
 
-@shared_task(bind=True)
+@app.task(bind=True)
 def create_products_from_trends(self):
     """Auto-create products from high-scoring trends"""
     db = SessionLocal()
@@ -205,7 +205,7 @@ def create_products_from_trends(self):
         raise
 
 
-@shared_task(bind=True)
+@app.task(bind=True)
 def sync_product_metrics(self):
     """Sync sales/traffic metrics from platforms"""
     db = SessionLocal()
@@ -230,7 +230,7 @@ def sync_product_metrics(self):
         raise
 
 
-@shared_task(bind=True)
+@app.task(bind=True)
 def check_daily_cost(self):
     """Cost guard - halt if over limit"""
     cost = ai_service.get_cost_today()

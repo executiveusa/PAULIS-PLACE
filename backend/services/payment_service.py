@@ -63,7 +63,7 @@ class Payment(Base):
 
     # Metadata
     customer_email = Column(String(200), nullable=True)
-    metadata = Column(JSON, default=dict)
+    payment_metadata = Column(JSON, default=dict)
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -124,7 +124,7 @@ class PaymentService:
                 amount=amount,
                 currency="USD",
                 status=PaymentStatus.PENDING.value,
-                metadata={"created_by": "402_middleware"}
+                payment_metadata={"created_by": "402_middleware"}
             )
             db.add(payment)
             db.commit()
@@ -292,7 +292,7 @@ class PaymentService:
             if not payment:
                 # Try by metadata
                 payment = db.query(Payment).filter(
-                    Payment.metadata['btcpay_invoice_id'].as_string() == invoice_id
+                    Payment.payment_metadata['btcpay_invoice_id'].as_string() == invoice_id
                 ).first()
             if not payment:
                 return {"error": "Payment not found"}

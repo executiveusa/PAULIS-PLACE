@@ -212,7 +212,7 @@ def upgrade():
         sa.Column('btc_invoice_url', sa.String(1000), nullable=True),
         sa.Column('creem_checkout_url', sa.String(1000), nullable=True),
         sa.Column('customer_email', sa.String(200), nullable=True),
-        sa.Column('metadata', sa.JSON(), default=dict),
+        sa.Column('payment_metadata', sa.JSON(), default=dict),
         sa.Column('created_at', sa.DateTime()),
         sa.Column('paid_at', sa.DateTime(), nullable=True),
         sa.Column('expires_at', sa.DateTime(), nullable=True),

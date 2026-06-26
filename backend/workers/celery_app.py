@@ -3,10 +3,6 @@ from celery.schedules import crontab
 from config import SETTINGS
 
 app = Celery('digifactory')
-app.config_from_object('django.conf:settings', namespace='CELERY')
-app.autodiscover_tasks()
-
-# Configure
 app.conf.update(
     broker_url=SETTINGS.redis_url,
     result_backend=SETTINGS.redis_url,
@@ -17,6 +13,7 @@ app.conf.update(
     enable_utc=True,
     worker_prefetch_multiplier=1,
     task_acks_late=True,
+    imports=('workers.tasks', 'workers.boot_task'),
 )
 
 # Beat schedule - automated tasks

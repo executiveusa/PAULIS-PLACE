@@ -12,12 +12,13 @@ from celery import shared_task
 from models.base import Base, engine, SessionLocal
 from models.research import NicheInsight
 from config import SETTINGS
+from workers.celery_app import app
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-@shared_task(bind=True)
+@app.task(bind=True)
 def boot_system(self):
     """
     Zero-touch boot sequence.

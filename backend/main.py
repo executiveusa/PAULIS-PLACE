@@ -93,9 +93,12 @@ def trigger_product_creation(db: Session = Depends(get_db)):
 
 @app.get("/api/health")
 def health_check():
+    from config import SETTINGS
     return {
         "status": "healthy",
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "redis_url": SETTINGS.redis_url,
+        "broker_check": "redis" in SETTINGS.redis_url,
     }
 
 

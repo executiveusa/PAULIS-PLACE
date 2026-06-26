@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     environment: str = "development"
 
     # Paths
-    generated_path: Path = Path("/app/generated")
+    generated_path: Path = Path("./generated")
 
     # Niche Configuration
     niches: list = [
