@@ -122,7 +122,7 @@ class WikiService:
                 "summarize_for_wiki",
                 f"Summarize in one sentence (max 150 chars):\n\n{content[:2000]}",
                 system_prompt="You write concise summaries.",
-                force_model="glm-4",
+                force_model="gpt-oss-20b",
                 max_tokens=100
             )
             raw = summary_result["content"]

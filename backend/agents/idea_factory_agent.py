@@ -40,7 +40,7 @@ class MashupGenerator:
             f"Pick {count} UNIQUE pairs from these niches that would create interesting mashups:\n{self.niches}\n\nRules:\n- No pair should share obvious overlap\n- Prioritize 'weird but intriguing' combinations\n- At least 3 pairs should be 'so weird it might work'\n\nOutput as JSON: {{\"pairs\": [[\"niche_a\", \"niche_b\"], ...]}}",
             system_prompt="You generate creative pairings. Output valid JSON only.",
             response_format={"type": "json_object"},
-            force_model="deepseek-v2",
+            force_model="llama-8b",
             temperature=0.9
         )
 
@@ -55,7 +55,7 @@ class MashupGenerator:
                 f"Create a product idea by mashing up: {pair[0]} + {pair[1]}\n\n{RUTHLESS_TASKS['mashup_ideas']}",
                 system_prompt=RUTHLESS_SYSTEM_PROMPT,
                 response_format={"type": "json_object"},
-                force_model="deepseek-v2"
+                force_model="llama-8b"
             )
 
             if isinstance(idea["content"], dict):
@@ -103,7 +103,7 @@ class EtsyAutocompleteSpy:
                 f"Generate 20 Etsy autocomplete suggestions for: {base_keyword}\n\n{RUTHLESS_TASKS['etsy_autocomplete']}",
                 system_prompt=RUTHLESS_SYSTEM_PROMPT,
                 response_format={"type": "json_object"},
-                force_model="deepseek-v2"
+                force_model="llama-8b"
             )
             return fallback["content"].get("ideas", []) if isinstance(fallback["content"], dict) else []
 
@@ -112,7 +112,7 @@ class EtsyAutocompleteSpy:
             f"Analyze these Etsy autocomplete suggestions and find the money:\n\nBase keyword: {base_keyword}\nSuggestions: {suggestions}\n\n{RUTHLESS_TASKS['etsy_autocomplete']}",
             system_prompt=RUTHLESS_SYSTEM_PROMPT,
             response_format={"type": "json_object"},
-            force_model="glm-5.2",
+            force_model="llama-70b",
             context={"estimated_value": 50}
         )
 
@@ -141,7 +141,7 @@ Additional context - look for:
 Be brutally specific. Quote patterns you'd expect to see.""",
             system_prompt=RUTHLESS_SYSTEM_PROMPT,
             response_format={"type": "json_object"},
-            force_model="glm-5.2",
+            force_model="llama-70b",
             context={"estimated_value": 30}
         )
 
@@ -176,7 +176,7 @@ Output JSON:
 }}""",
             system_prompt=RUTHLESS_SYSTEM_PROMPT,
             response_format={"type": "json_object"},
-            force_model="deepseek-v2"
+            force_model="llama-8b"
         )
 
         return counter["content"] if isinstance(counter["content"], dict) else {}
@@ -213,7 +213,7 @@ RULES:
 Design 3-5 bundles. Output JSON: {{"bundles": [...]}}""",
             system_prompt=RUTHLESS_SYSTEM_PROMPT,
             response_format={"type": "json_object"},
-            force_model="deepseek-v2"
+            force_model="llama-8b"
         )
 
         return bundles["content"].get("bundles", []) if isinstance(bundles["content"], dict) else []
@@ -246,7 +246,7 @@ Generate:
 Output JSON with all fields.""",
             system_prompt=RUTHLESS_SYSTEM_PROMPT,
             response_format={"type": "json_object"},
-            force_model="deepseek-v2"
+            force_model="llama-8b"
         )
 
         return listing["content"] if isinstance(listing["content"], dict) else {}
@@ -278,7 +278,7 @@ Additional rules:
 Output JSON.""",
             system_prompt=RUTHLESS_SYSTEM_PROMPT,
             response_format={"type": "json_object"},
-            force_model="deepseek-v2"
+            force_model="llama-8b"
         )
 
         return plan["content"] if isinstance(plan["content"], dict) else {}
@@ -308,7 +308,7 @@ Variation styles to include:
 Output as JSON: {{"pins": [...]}}""",
             system_prompt="You create Pinterest-optimized content.",
             response_format={"type": "json_object"},
-            force_model="deepseek-v2",
+            force_model="llama-8b",
             temperature=0.8
         )
 

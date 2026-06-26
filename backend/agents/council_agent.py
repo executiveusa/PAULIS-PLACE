@@ -258,7 +258,7 @@ Output JSON:
             prompt,
             system_prompt=RUTHLESS_SYSTEM_PROMPT,
             response_format={"type": "json_object"},
-            force_model="deepseek-v2",
+            force_model="llama-8b",
             temperature=0.6
         )
 
@@ -312,7 +312,7 @@ Output JSON:
             prompt,
             system_prompt="You are a ruthless critic. Find flaws. Be specific. No hand-waving.",
             response_format={"type": "json_object"},
-            force_model="ornith-1",
+            force_model="qwen-32b",
             temperature=0.4
         )
 
@@ -369,7 +369,7 @@ Output JSON:
             prompt,
             system_prompt=RUTHLESS_SYSTEM_PROMPT,
             response_format={"type": "json_object"},
-            force_model="glm-5.2",
+            force_model="llama-70b",
             context={"estimated_value": 100}
         )
 

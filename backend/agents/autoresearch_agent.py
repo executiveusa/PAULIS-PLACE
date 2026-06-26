@@ -176,7 +176,7 @@ Output JSON:
     "uncertain_areas": ["what we're not sure about"]
 }""",
             response_format={"type": "json_object"},
-            force_model="deepseek-v2"
+            force_model="llama-8b"
         )
 
         return synthesis["content"] if isinstance(synthesis["content"], dict) else {"summary": str(synthesis["content"])}
@@ -198,7 +198,7 @@ Generate gaps as JSON:
 }}]}}""",
             system_prompt="You identify knowledge gaps. Be specific about what's missing. Output JSON with 'gaps' array.",
             response_format={"type": "json_object"},
-            force_model="glm-4"
+            force_model="gpt-oss-20b"
         )
 
         gaps = []
@@ -263,7 +263,7 @@ Output JSON:
 }}""",
             system_prompt="You extract actionable insights. Every insight must have a concrete action.",
             response_format={"type": "json_object"},
-            force_model="deepseek-v2"
+            force_model="llama-8b"
         )
 
         return actions["content"] if isinstance(actions["content"], dict) else {"insights": []}
@@ -306,7 +306,7 @@ Output JSON:
 }}""",
             system_prompt=RUTHLESS_SYSTEM_PROMPT,
             response_format={"type": "json_object"},
-            force_model="glm-5.2",
+            force_model="llama-70b",
             context={"estimated_value": 100}
         )
 
@@ -320,7 +320,7 @@ Output JSON:
             "execute_search",
             f"Search result for: {query}\n\nProvide factual, specific information. Include sources/URLs if possible.",
             system_prompt="You are a search engine. Provide factual results. Be specific, not vague.",
-            force_model="deepseek-v2",
+            force_model="llama-8b",
             temperature=0.3
         )
 

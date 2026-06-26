@@ -30,6 +30,7 @@ class Settings(BaseSettings):
 
     # OpenRouter (for multi-model routing)
     openrouter_api_key: str = ""
+    groq_api_key: str = ""
     app_url: str = "http://localhost:3000"
 
     # Payments (402 flow)

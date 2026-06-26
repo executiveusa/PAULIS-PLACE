@@ -1,19 +1,33 @@
-import openai
-import httpx
+"""
+AI SERVICE - Refactored to use OpenRouter via Model Router
+==========================================================
+All LLM calls now route through the model_router which:
+- Uses OpenRouter (not direct OpenAI)
+- Picks the cheapest model per task
+- Tracks costs automatically
+- Falls back gracefully
+"""
+
 import base64
 import json
 from typing import Optional
 from config import SETTINGS
+from services.model_router import model_router
 
 
 class AIService:
+    """
+    All methods now delegate to model_router.call() which routes
+    through OpenRouter to the cheapest capable model.
+    """
+
     def __init__(self):
-        self.client = openai.OpenAI(api_key=SETTINGS.openai_api_key)
         self.cost_tracker = {"tokens": 0, "cost": 0.0}
 
-    def _track_usage(self, usage):
-        self.cost_tracker["tokens"] += usage.total_tokens
-        self.cost_tracker["cost"] += usage.total_tokens / 1_000_000 * 5  # Rough GPT-4o estimate
+    def _track_from_usage(self, usage: dict):
+        """Track cost from model_router usage log"""
+        self.cost_tracker["tokens"] += usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
+        self.cost_tracker["cost"] += usage.get("cost", 0.0)
 
     async def analyze_competitor(self, product_data: dict) -> dict:
         """Analyze a competitor product to extract patterns"""
@@ -48,14 +62,15 @@ Extract and return JSON with:
     }}
 }}"""
 
-        response = await self.client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt.format(product_data=json.dumps(product_data, indent=2))}],
+        result = await model_router.call(
+            "analyze_competitor",
+            prompt.format(product_data=json.dumps(product_data, indent=2)),
             response_format={"type": "json_object"},
             temperature=0.3
         )
-        self._track_usage(response.usage)
-        return json.loads(response.choices[0].message.content)
+        self._track_from_usage(result.get("usage", {}))
+        content = result["content"]
+        return content if isinstance(content, dict) else json.loads(content)
 
     async def generate_design_prompt(self, niche: str, trend_data: dict, competitor_patterns: dict, product_type: str) -> str:
         """Generate an image generation prompt based on research"""
@@ -74,18 +89,18 @@ Requirements:
 
 Return ONLY the image generation prompt, nothing else. Make it detailed (100-200 words)."""
 
-        response = await self.client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt.format(
+        result = await model_router.call(
+            "generate_design_prompt",
+            prompt.format(
                 product_type=product_type,
                 niche=niche,
                 trend_data=json.dumps(trend_data),
                 patterns=json.dumps(competitor_patterns)
-            )}],
+            ),
             temperature=0.7
         )
-        self._track_usage(response.usage)
-        return response.choices[0].message.content.strip()
+        self._track_from_usage(result.get("usage", {}))
+        return str(result["content"]).strip()
 
     async def generate_listing_copy(self, product_type: str, niche: str, design_description: str, competitor_copies: list) -> dict:
         """Generate optimized listing title, description, tags"""
@@ -107,19 +122,20 @@ Return JSON:
     "category": "suggested Etsy/Printify category path"
 }}"""
 
-        response = await self.client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt.format(
+        result = await model_router.call(
+            "generate_listing_copy",
+            prompt.format(
                 product_type=product_type,
                 niche=niche,
                 design=design_description,
                 examples="\n---\n".join(competitor_copies[:5])
-            )}],
+            ),
             response_format={"type": "json_object"},
             temperature=0.6
         )
-        self._track_usage(response.usage)
-        return json.loads(response.choices[0].message.content)
+        self._track_from_usage(result.get("usage", {}))
+        content = result["content"]
+        return content if isinstance(content, dict) else json.loads(content)
 
     async def assess_trend_opportunity(self, keyword: str, niche: str, trends_data: dict, market_context: dict) -> dict:
         """Score a trend's opportunity level"""
@@ -138,30 +154,36 @@ Score 0-100 on each dimension and explain reasoning. Return JSON:
     "timing_score": {{"score": 0-100, "reasoning": "...", "is_early": bool}},
     "product_fit_score": {{"score": 0-100, "reasoning": "..."}},
     "product_ideas": [
-        {{"type": "sticker/wall_art/t_shirt/etc", "angle": "specific angle to take", "prompt_direction": "what the design should focus on"}},
-        ...
+        {{"type": "sticker/wall_art/t_shirt/etc", "angle": "specific angle to take", "prompt_direction": "what the design should focus on"}}
     ],
     "recommended_action": "create_now/watch/ignore",
     "action_rationale": "why this recommendation"
 }}"""
 
-        response = await self.client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt.format(
+        result = await model_router.call(
+            "assess_trend_opportunity",
+            prompt.format(
                 keyword=keyword,
                 niche=niche,
                 trends=json.dumps(trends_data),
                 market=json.dumps(market_context)
-            )}],
+            ),
             response_format={"type": "json_object"},
             temperature=0.4
         )
-        self._track_usage(response.usage)
-        return json.loads(response.choices[0].message.content)
+        self._track_from_usage(result.get("usage", {}))
+        content = result["content"]
+        return content if isinstance(content, dict) else json.loads(content)
 
     async def generate_image(self, prompt: str, size: str = "1024x1024", style: str = "vivid") -> str:
-        """Generate image using DALL-E 3, return base64"""
-        response = await self.client.images.generate(
+        """Generate image using DALL-E 3 via OpenAI (images still need OpenAI directly)"""
+        if not SETTINGS.openai_api_key:
+            raise Exception("OpenAI API key required for image generation (DALL-E 3 not available via OpenRouter)")
+
+        import openai
+        client = openai.OpenAI(api_key=SETTINGS.openai_api_key)
+
+        response = await client.images.generate(
             model="dall-e-3",
             prompt=prompt,
             size=size,
@@ -170,7 +192,6 @@ Score 0-100 on each dimension and explain reasoning. Return JSON:
             n=1,
             response_format="b64_json"
         )
-        # Rough cost tracking
         self.cost_tracker["cost"] += 0.04 if size == "1024x1024" else 0.08
         return response.data[0].b64_json
 
@@ -194,7 +215,8 @@ Score 0-100 on each dimension and explain reasoning. Return JSON:
         return variations
 
     def get_cost_today(self) -> float:
-        return self.cost_tracker["cost"]
+        router_cost = model_router.get_cost_report()["total_cost"]
+        return self.cost_tracker["cost"] + router_cost
 
 
 ai_service = AIService()
