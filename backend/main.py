@@ -7,7 +7,7 @@ from models.task import Task, TaskStatus
 from models.trend import Trend
 from models.research import NicheInsight
 from api import dashboard, products, tasks, approvals
-from api import research_lab, payments, council
+from api import research_lab, payments, council, memory
 from workers.tasks import scan_all_trends, score_hot_trends, create_products_from_trends
 from workers.boot_task import boot_system
 import json
@@ -35,6 +35,7 @@ app.include_router(approvals.router, prefix="/api/approvals", tags=["approvals"]
 app.include_router(research_lab.router, tags=["research_lab"])
 app.include_router(payments.router, tags=["payments"])
 app.include_router(council.router, tags=["council"])
+app.include_router(memory.router, tags=["memory"])
 
 # WebSocket for real-time updates
 class ConnectionManager:

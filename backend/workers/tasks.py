@@ -11,6 +11,7 @@ from services.trends_service import trends_service
 from services.ai_service import ai_service
 from agents.research_agent import research_agent
 from agents.design_agent import design_agent
+from agents.watcher_agent import watcher_agent
 from config import SETTINGS
 
 
@@ -241,3 +242,39 @@ def check_daily_cost(self):
         return {"status": "limit_reached", "cost": cost}
 
     return {"status": "ok", "cost": cost}
+
+# ============================================
+# WATCHER TASKS
+# ============================================
+
+@app.task
+def watcher_observation():
+    """Watcher observation loop - runs every 30 seconds"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(watcher_agent.run_observation_loop())
+    finally:
+        loop.close()
+
+
+@app.task
+def watcher_analysis():
+    """Watcher analysis loop - runs every 5 minutes"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(watcher_agent.run_analysis_loop())
+    finally:
+        loop.close()
+
+
+@app.task
+def watcher_improvement():
+    """Watcher improvement loop - runs every hour"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(watcher_agent.run_improvement_loop())
+    finally:
+        loop.close()

@@ -218,6 +218,32 @@ def upgrade():
         sa.Column('expires_at', sa.DateTime(), nullable=True),
     )
 
+    # Evolving Memory (Watcher system)
+    op.create_table(
+        'evolving_memory',
+        sa.Column('id', sa.Integer(), primary_key=True, index=True),
+        sa.Column('memory_id', sa.String(100), unique=True, index=True),
+        sa.Column('memory_type', sa.String(50), index=True),
+        sa.Column('content', sa.JSON(), nullable=False),
+        sa.Column('confidence', sa.String(20), default='hypothesis'),
+        sa.Column('evidence_count', sa.Integer(), default=0),
+        sa.Column('success_rate', sa.Float(), default=0.0),
+        sa.Column('parent_ids', sa.JSON(), default=list),
+        sa.Column('child_ids', sa.JSON(), default=list),
+        sa.Column('tags', sa.JSON(), default=list),
+        sa.Column('times_used', sa.Integer(), default=0),
+        sa.Column('times_succeeded', sa.Integer(), default=0),
+        sa.Column('is_active', sa.Boolean(), default=True),
+        sa.Column('created_at', sa.DateTime()),
+        sa.Column('evolved_at', sa.DateTime()),
+        sa.Column('scaffold_steps', sa.JSON(), nullable=True),
+        sa.Column('preconditions', sa.JSON(), default=list),
+        sa.Column('success_criteria', sa.JSON(), default=list),
+        sa.Column('target_file', sa.String(500), nullable=True),
+        sa.Column('modification_type', sa.String(50), nullable=True),
+        sa.Column('rollback_content', sa.JSON(), nullable=True),
+    )
+
 
 def downgrade():
     op.drop_table('payments')

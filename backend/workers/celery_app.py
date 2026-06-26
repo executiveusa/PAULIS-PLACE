@@ -65,6 +65,20 @@ app.conf.beat_schedule = {
         'task': 'workers.tasks.check_daily_cost',
         'schedule': crontab(hour='*/1', minute=0),
     },
+
+    # Watcher loops
+    'watcher-observation': {
+        'task': 'workers.tasks.watcher_observation',
+        'schedule': 30.0,  # Every 30 seconds
+    },
+    'watcher-analysis': {
+        'task': 'workers.tasks.watcher_analysis',
+        'schedule': 300.0,  # Every 5 minutes
+    },
+    'watcher-improvement': {
+        'task': 'workers.tasks.watcher_improvement',
+        'schedule': 3600.0,  # Every hour
+    },
 }
 
 if __name__ == '__main__':
