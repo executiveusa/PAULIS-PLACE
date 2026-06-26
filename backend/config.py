@@ -28,6 +28,16 @@ class Settings(BaseSettings):
     # Fiverr
     fiverr_access_token: str = ""
 
+    # OpenRouter (for multi-model routing)
+    openrouter_api_key: str = ""
+    app_url: str = "http://localhost:3000"
+
+    # Payments (402 flow)
+    creem_api_key: str = ""
+    btcpay_api_url: str = ""
+    btcpay_store_id: str = ""
+    btcpay_api_key: str = ""
+
     # App
     secret_key: str = "changeme"
     environment: str = "development"
@@ -50,7 +60,15 @@ class Settings(BaseSettings):
     auto_approve_design: bool = False
     auto_approve_listing: bool = False
     auto_publish: bool = False
-    max_daily_spend: float = 10.0  # AI cost guard
+    max_daily_spend: float = 5.0  # $5/day max (more aggressive)
+
+    # Research settings
+    max_research_iterations: int = 3
+    max_searches_per_research: int = 15
+
+    # Cost guards (more aggressive)
+    max_cost_per_idea: float = 0.10  # $0.10 per idea
+    max_cost_per_product: float = 0.25  # $0.25 per product creation
 
     class Config:
         env_file = ".env"

@@ -9,7 +9,9 @@ import {
   ClipboardCheck,
   Settings,
   Zap,
-  DollarSign
+  DollarSign,
+  Brain,
+  Eye
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -18,6 +20,8 @@ const navItems = [
   { href: '/trends', label: 'Trends', icon: TrendingUp },
   { href: '/products', label: 'Products', icon: Package },
   { href: '/queue', label: 'Approval Queue', icon: ClipboardCheck },
+  { href: '/research', label: 'Research Lab', icon: Brain },
+  { href: '/observation', label: 'Observation', icon: Eye },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

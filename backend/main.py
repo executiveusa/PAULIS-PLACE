@@ -7,7 +7,9 @@ from models.task import Task, TaskStatus
 from models.trend import Trend
 from models.research import NicheInsight
 from api import dashboard, products, tasks, approvals
+from api import research_lab, payments, council
 from workers.tasks import scan_all_trends, score_hot_trends, create_products_from_trends
+from workers.boot_task import boot_system
 import json
 from datetime import datetime, timezone
 
@@ -30,6 +32,9 @@ app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"]
 app.include_router(products.router, prefix="/api/products", tags=["products"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["tasks"])
 app.include_router(approvals.router, prefix="/api/approvals", tags=["approvals"])
+app.include_router(research_lab.router, tags=["research_lab"])
+app.include_router(payments.router, tags=["payments"])
+app.include_router(council.router, tags=["council"])
 
 # WebSocket for real-time updates
 class ConnectionManager:
@@ -92,6 +97,13 @@ def health_check():
         "status": "healthy",
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
+
+
+@app.post("/api/trigger/boot")
+def trigger_boot():
+    """Trigger the VPS boot sequence (migrations, seed, start agents)"""
+    task = boot_system.delay()
+    return {"status": "queued", "task_id": task.id}
 
 
 if __name__ == "__main__":
