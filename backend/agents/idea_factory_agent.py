@@ -20,9 +20,10 @@ from services.model_router import model_router
 from services.wiki_service import wiki_service
 from prompts.ruthless_system import RUTHLESS_SYSTEM_PROMPT, RUTHLESS_TASKS
 from config import SETTINGS
+from agents.memory_aware_mixin import MemoryAwareAgent
 
 
-class MashupGenerator:
+class MashupGenerator(MemoryAwareAgent):
     """Combine unrelated niches for weird-but-profitable products"""
 
     def __init__(self):

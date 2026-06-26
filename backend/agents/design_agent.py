@@ -9,9 +9,10 @@ from models.trend import Trend
 from models.research import NicheInsight, CompetitorProduct
 from services.ai_service import ai_service
 from config import SETTINGS
+from agents.memory_aware_mixin import MemoryAwareAgent, with_memory
 
 
-class DesignAgent:
+class DesignAgent(MemoryAwareAgent):
     """Generates designs based on research and trends"""
 
     def __init__(self):

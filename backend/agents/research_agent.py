@@ -8,9 +8,10 @@ from models.research import CompetitorProduct, NicheInsight
 from models.trend import Trend
 from services.ai_service import ai_service
 from bs4 import BeautifulSoup
+from agents.memory_aware_mixin import MemoryAwareAgent
 
 
-class ResearchAgent:
+class ResearchAgent(MemoryAwareAgent):
     """
     The Karpathy approach: Don't guess what works.
     Analyze what's already selling, find patterns, replicate with variation.
