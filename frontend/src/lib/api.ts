@@ -1,6 +1,4 @@
-// Use relative path so Vercel's rewrite proxy handles HTTPS->HTTP bridging
-// This avoids Mixed Content errors when frontend is on HTTPS but backend is HTTP
-const API_URL = '';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export async function fetchJSON<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
@@ -48,7 +46,6 @@ export const api = {
   },
 };
 
-// Types
 export interface DashboardStats {
   products: { total: number; published: number; pending_approval: number; drafts: number };
   revenue: { total: number; last_7_days: number; total_sales: number; by_platform: Record<string, { revenue: number; count: number }> };
@@ -57,98 +54,17 @@ export interface DashboardStats {
 }
 
 export interface Product {
-  id: number;
-  external_id: string;
-  platform: string;
-  product_type: string;
-  title: string;
-  description: string;
-  tags: string[];
-  niche: string;
-  price: number;
-  status: string;
-  views: number;
-  sales: number;
-  revenue: number;
-  created_at: string;
-  research_data?: any;
+  id: number; external_id: string; platform: string; product_type: string;
+  title: string; description: string; tags: string[]; niche: string;
+  price: number; status: string; views: number; sales: number; revenue: number;
+  created_at: string; research_data?: any;
 }
 
-export interface Trend {
-  id: number;
-  keyword: string;
-  niche: string;
-  interest_score: number;
-  change_7d: number;
-  opportunity_score: number;
-  competition_level: string;
-  product_ideas: ProductIdea[];
-  is_breakout: boolean;
-  last_scanned: string;
-}
-
-export interface ProductIdea {
-  type: string;
-  angle: string;
-  prompt_direction: string;
-}
-
-export interface Task {
-  id: number;
-  task_type: string;
-  status: string;
-  input_data: any;
-  output_data: any;
-  error_message: string | null;
-  ai_cost: number;
-  created_at: string;
-}
-
-export interface ApprovalQueue {
-  pending: Product[];
-  ready_to_publish: Product[];
-}
-
-export interface ApprovalResult {
-  id: number;
-  status: string;
-  message?: string;
-}
-
-export interface ProductFilters {
-  platform?: string;
-  status?: string;
-  niche?: string;
-}
-
-export interface ProductListResponse {
-  total: number;
-  items: Product[];
-}
-
-export interface RevenueData {
-  date: string;
-  products_created: number;
-  revenue: number;
-}
-
-export interface NicheData {
-  id: number;
-  niche: string;
-  avg_price: number;
-  total_products_analyzed: number;
-  top_keywords: string[];
-  underserved_subniches: any[];
-  product_type_distribution: Record<string, number>;
-  updated_at: string;
-}
-
-export interface TaskSummary {
-  [taskType: string]: {
-    pending?: number;
-    running?: number;
-    completed?: number;
-    failed?: number;
-    cancelled?: number;
-  };
-}
+export interface Task { id: number; task_type: string; status: string; ai_cost: number; created_at: string; }
+export interface ApprovalQueue { pending: Product[]; ready_to_publish: Product[]; }
+export interface ApprovalResult { id: number; status: string; message?: string; }
+export interface ProductFilters { platform?: string; status?: string; niche?: string; }
+export interface ProductListResponse { total: number; items: Product[]; }
+export interface RevenueData { date: string; products_created: number; revenue: number; }
+export interface NicheData { id: number; niche: string; avg_price: number; updated_at: string; }
+export interface TaskSummary { [taskType: string]: { pending?: number; running?: number; completed?: number; failed?: number; }; }
