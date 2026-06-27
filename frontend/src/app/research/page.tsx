@@ -14,7 +14,7 @@ import {
   Target
 } from 'lucide-react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL = '';
 
 type Tab = 'research' | 'ideas' | 'wiki' | 'costs';
 
@@ -363,7 +363,7 @@ function WikiTab() {
   const [results, setResults] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const API_URL_LOCAL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const API_URL_LOCAL = '';
 
   useEffect(() => {
     fetch(`${API_URL_LOCAL}/api/research-lab/wiki/stats`).then(r => r.json()).then(setStats).catch(() => {});
@@ -445,7 +445,7 @@ function WikiTab() {
 
 function CostsTab() {
   const [costs, setCosts] = useState<any>(null);
-  const API_URL_LOCAL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const API_URL_LOCAL = '';
 
   useEffect(() => {
     fetch(`${API_URL_LOCAL}/api/research-lab/costs`).then(r => r.json()).then(setCosts).catch(() => {});

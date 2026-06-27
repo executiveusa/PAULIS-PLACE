@@ -1,4 +1,6 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Use relative path so Vercel's rewrite proxy handles HTTPS->HTTP bridging
+// This avoids Mixed Content errors when frontend is on HTTPS but backend is HTTP
+const API_URL = '';
 
 export async function fetchJSON<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
