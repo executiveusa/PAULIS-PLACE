@@ -68,3 +68,15 @@ export interface ProductListResponse { total: number; items: Product[]; }
 export interface RevenueData { date: string; products_created: number; revenue: number; }
 export interface NicheData { id: number; niche: string; avg_price: number; updated_at: string; }
 export interface TaskSummary { [taskType: string]: { pending?: number; running?: number; completed?: number; failed?: number; }; }
+
+export interface Trend {
+  id: number; keyword: string; niche: string; interest_score: number;
+  change_7d: number; change_30d: number; opportunity_score: number;
+  competition_level: string; product_ideas: ProductIdea[];
+  is_breakout: boolean; is_seasonal: boolean; is_evergreen: boolean;
+  products_created: number; last_scanned: string;
+}
+
+export interface ProductIdea {
+  type: string; angle: string; prompt_direction: string;
+}
