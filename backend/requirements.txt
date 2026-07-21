@@ -11,8 +11,8 @@ httpx==0.25.2
 openai==1.6.1
 beautifulsoup4==4.12.2
 pytrends==4.9.2
-lxml==4.9.4
-python-multipart==0.0.6
+lxml==6.1.0
+python-multipart==0.0.31
 websockets==12.0
-Pillow==10.1.0
+Pillow==12.3.0
 playwright==1.40.0
