@@ -1,0 +1,16 @@
+# agentcookie.toml: secrets-bus adoption manifest v2
+# See docs/spec-agentcookie-secrets-bus-v2-adoption.md
+schema_version = 2
+name = "printify2-pp-cli"
+display_name = "Printify Public"
+description = "Printify API enables you to automate product and order creation for a variety of scenarios"
+project_kind = "cli"
+
+[secrets.file]
+path = "~/.config/printify2-pp-cli/config.toml"
+
+[sync]
+default = false
+
+[sync.keys]
+PRINTIFY2_BEARER_AUTH = true

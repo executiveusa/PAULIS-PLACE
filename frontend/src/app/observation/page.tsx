@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { Brain, Cpu, DollarSign, Activity, Zap, MessageSquare, TrendingUp, Eye } from 'lucide-react';
+import { Brain, Cpu, DollarSign, Activity, Zap, MessageSquare, TrendingUp, Eye, Shield } from 'lucide-react';
+import { hemmes, Envelope } from '@/lib/loungeApi';
 
 const API_URL = '';
 const WS_URL = typeof window !== 'undefined'
@@ -42,6 +43,8 @@ export default function ObservationPage() {
   const [councilDelibs, setCouncilDelibs] = useState<CouncilDelib[]>([]);
   const [costs, setCosts] = useState<any>(null);
   const [wsConnected, setWsConnected] = useState(false);
+  const [hermes, setHermes] = useState<HermesHealth | null>(null);
+  const [envelopes, setEnvelopes] = useState<Envelope[]>([]);
   const [agents, setAgents] = useState<AgentCard[]>([
     { name: 'GLM-5.2', model: 'Strategist', tier: 'strategist', color: 'cyan', active: false },
     { name: 'DeepSeek', model: 'Workhorse', tier: 'workhorse', color: 'blue', active: false },
@@ -50,6 +53,17 @@ export default function ObservationPage() {
     { name: 'GLM-4', model: 'Grunt', tier: 'grunt', color: 'gray', active: false },
   ]);
   const consoleRef = useRef<HTMLDivElement>(null);
+
+  // Hermes health + envelopes feed (the Yappyverse L1-L4 observability layer)
+  useEffect(() => {
+    const fetchHermes = async () => {
+      try { setHermes(await hemmes.health()); } catch {}
+      try { const r = await hemmes.envelopes(60); setEnvelopes(r.envelopes || []); } catch {}
+    };
+    fetchHermes();
+    const t = setInterval(fetchHermes, 4000);
+    return () => clearInterval(t);
+  }, []);
 
   // Fetch logs periodically
   useEffect(() => {
@@ -146,13 +160,51 @@ export default function ObservationPage() {
             <Eye className="w-7 h-7 text-cyan-400" />
             Observation Center
           </h1>
-          <p className="text-gray-500 text-sm mt-1">PS4 Theater Mode - Real-time agent telemetry</p>
+          <p className="text-gray-500 text-sm mt-1">Yappyverse L1–L4 enforcement + real-time agent telemetry</p>
         </div>
         <div className="flex items-center gap-3">
           <div className={`w-3 h-3 rounded-full ${wsConnected ? 'bg-green-400' : 'bg-red-400'} animate-pulse`} />
           <span className="text-xs text-gray-400">{wsConnected ? 'LIVE' : 'RECONNECTING'}</span>
         </div>
       </div>
+
+      {/* Hermes hard-laws strip */}
+      {hermes && (
+        <div className="mb-6 grid grid-cols-12 gap-3">
+          <div className="col-span-3 rounded-lg border border-[#2A1F3D] bg-[#0A0714] p-3">
+            <div className="flex items-center gap-2 text-xs text-gray-500"><Shield className="w-4 h-4 text-[#C8AA32]"/>Hermes L1-L4</div>
+            <div className="mt-2 grid grid-cols-4 gap-1 text-[10px]">
+              {(['L1','L2','L3','L4'] as const).map((k) => (
+                <div key={k} className="px-2 py-1 rounded bg-[#1A1230] text-[#4DC99A] text-center">{k}:{hermes.laws[k]}</div>
+              ))}
+            </div>
+          </div>
+          <div className="col-span-3 rounded-lg border border-[#2A1F3D] bg-[#0A0714] p-3">
+            <div className="flex items-center gap-2 text-xs text-gray-500"><DollarSign className="w-4 h-4 text-green-400"/>Daily cap</div>
+            <div className="text-2xl mt-1 font-bold text-green-400">${hermes.spent_usd.toFixed(2)} / ${hermes.cap_usd.toFixed(2)}</div>
+            <div className="h-1.5 mt-2 bg-gray-800 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-green-400 to-amber-400" style={{width: `${Math.min(100, (hermes.spent_usd / hermes.cap_usd) * 100)}%`}}/>
+            </div>
+          </div>
+          <div className="col-span-6 rounded-lg border border-[#2A1F3D] bg-[#0A0714] p-3 max-h-[200px] overflow-y-auto">
+            <div className="flex items-center justify-between text-xs text-gray-500">
+              <span className="flex items-center gap-2"><Zap className="w-3 h-3 text-[#FF6432]"/>Recent envelopes</span>
+              <span>{envelopes.length}</span>
+            </div>
+            <ul className="mt-2 space-y-1 text-[11px] font-mono">
+              {envelopes.slice(0, 12).map((e, i) => (
+                <li key={e.event_id + i} className="text-gray-300">
+                  <span className="text-[#C8AA32]">{e.route}</span>
+                  <span className="text-gray-600"> · {e.stage}</span>
+                  <span className="text-gray-500"> · {e.judge_verdict ?? '—'}</span>
+                  {e.halt && <span className="ml-2 text-[#E05A5A]">HALT</span>}
+                </li>
+              ))}
+              {envelopes.length === 0 && <li className="text-gray-600">no events yet</li>}
+            </ul>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-12 gap-4 h-[calc(100vh-140px)]">
         {/* Stage Left: Agent Roster */}
@@ -334,4 +386,13 @@ function tierColor(tier: string): string {
     grunt: 'text-gray-400',
   };
   return map[tier] || 'text-gray-400';
+}
+
+interface HermesHealth {
+  status: 'ok' | 'cap_reached';
+  spent_usd: number;
+  cap_usd: number;
+  remaining_usd: number;
+  routes_known: number;
+  laws: { L1: string; L2: string; L3: string; L4: string };
 }

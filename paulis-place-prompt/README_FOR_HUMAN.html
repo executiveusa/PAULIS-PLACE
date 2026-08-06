@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>YAPPYVERSE BUILD — Read Me First</title>
+<style>body{font-family:-apple-system,Segoe UI,system-ui,sans-serif;max-width:820px;margin:2rem auto;padding:0 1.5rem;background:#0A0714;color:#E6DCFF;line-height:1.65;font-size:16px}h1,h2{color:#FF6432;font-family:Georgia,serif;font-style:italic}h1{border-bottom:2px solid #C8AA32;padding-bottom:.5rem}h2{margin-top:2rem}.action{background:#1A1230;border-left:4px solid #C8AA32;padding:14px 20px;margin:1rem 0;border-radius:0 8px 8px 0}.step-n{color:#C8AA32;font-weight:600}code{background:#1E1035;color:#C8AA32;padding:2px 6px;border-radius:3px;font-size:.9em}.now{background:#3A2A0A;color:#D4A017;font-size:.75em;padding:2px 8px;border-radius:3px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.later{background:#0A1E3A;color:#5B9BD5;font-size:.75em;padding:2px 8px;border-radius:3px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}</style></head><body>
+
+<h1>YAPPYVERSE Build — Read Me First</h1>
+<p>This is the ADHD-friendly index. No wall of text. Do these in order.</p>
+
+<h2>What you have</h2>
+<p>Ten HTML spec files. Each one covers exactly one subsystem. A worker (Claude, GLM 5.2, Codex, whoever) opens exactly ONE file and builds exactly ONE thing. Nothing else.</p>
+
+<div class="action">
+<span class="now">Do this first</span>
+<p><span class="step-n">1.</span> Open <code>00_MASTER_INDEX.html</code>. Read section 4 (the routing table) and section 6 (the subsystem list). That's it — you now understand the whole plan.</p>
+</div>
+
+<div class="action">
+<span class="now">Do this second</span>
+<p><span class="step-n">2.</span> Run the Zernio auth flow yourself. It's a browser click. See <code>subsystems/05_zernio_social_posting.html</code> section 3. You get a key, we put it in <code>.env</code>. Total time: 5 minutes.</p>
+</div>
+
+<div class="action">
+<span class="now">Do this third</span>
+<p><span class="step-n">3.</span> Decide on Hermes' runtime. Section 3 of the index gives the three options. Pick ONE. If you have a VPS that stays on (<code>31.220.58.212</code> already runs Open Brain), use that.</p>
+</div>
+
+<div class="action">
+<span class="later">Do this fourth</span>
+<p><span class="step-n">4.</span> Hand each subsystem to a worker with this exact instruction: <em>"Read <code>subsystems/&lt;N&gt;_&lt;name&gt;.html</code> and produce the code for this subsystem only. Do not read any other subsystem file. Output must satisfy section 10 (acceptance criteria) of that file."</em> Start with subsystem 01 (Hermes). It unlocks everything else.</p>
+</div>
+
+<h2>The five things this build does when it's done</h2>
+<ol>
+<li><strong>Makes money.</strong> Six revenue channels run on cron, autonomously.</li>
+<li><strong>Posts to socials.</strong> Every revenue event auto-posts to the right platforms via Zernio.</li>
+<li><strong>Debates decisions.</strong> Every meaningful call goes through an adversarial three-turn Council.</li>
+<li><strong>Shows the work.</strong> Public visitors walk into a 3D lounge, see the avatars actually working, talk to them like Jarvis.</li>
+<li><strong>Gets smarter every night.</strong> A nightly loop reads the day's ops and opens PRs to improve the weak axes.</li>
+</ol>
+
+<h2>The three laws you enforce as the human</h2>
+<ol>
+<li>Nothing gets published (Etsy, Creem, KDP, Zernio) without your approval on the specific artifact.</li>
+<li>No PR gets merged automatically. Ever.</li>
+<li>Daily AI spend cap is $5. If it hits the cap, everything stops until tomorrow.</li>
+</ol>
+
+<h2>What to do if a worker gets stuck</h2>
+<p>Tell them to halt and ask, not guess. The specs are silent on many small things on purpose — those are places where a fresh human decision is worth more than a guess.</p>
+
+<h2>Share this whole folder with the team</h2>
+<p>The <code>plan/</code> folder is model-agnostic and self-contained. Any worker can pick a subsystem and build it. When you download the ZIP, the ten spec files plus this README are all a new team member needs to onboard.</p>
+
+</body></html>

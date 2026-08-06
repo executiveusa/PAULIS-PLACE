@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>07 — PAULIE'S PLACE 3D WORLD</title>
+<style>body{font-family:ui-monospace,Menlo,monospace;max-width:1100px;margin:2rem auto;padding:0 1.5rem;background:#0A0714;color:#E6DCFF;line-height:1.65;font-size:15px}h1,h2,h3{color:#FF6432;font-family:Georgia,serif;font-style:italic;font-weight:500}h1{border-bottom:2px solid #C8AA32;padding-bottom:.5rem}h2{border-bottom:1px solid #2A1F3D;padding-bottom:.3rem;margin-top:2rem}code{background:#1E1035;color:#C8AA32;padding:2px 6px;border-radius:3px;font-size:.9em}pre{background:#140F1E;border:1px solid #2A1F3D;padding:1rem;border-radius:6px;overflow-x:auto;font-size:.85em}table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.9em}th,td{border:1px solid #2A1F3D;padding:8px 12px;text-align:left;vertical-align:top}th{background:#1A1230;color:#C8AA32}tr:nth-child(even) td{background:#140F1E}.step{margin:1rem 0;padding-left:1rem;border-left:2px solid #C8AA32}.step-id{color:#C8AA32;font-family:ui-monospace,monospace;font-size:.75em}.step-title{color:#E6DCFF;font-weight:600;margin:2px 0 6px}.warn{background:#3A0A0A;border-left:4px solid #E05A5A;padding:12px 16px;margin:1rem 0;border-radius:0 6px 6px 0}.info{background:#0A1E3A;border-left:4px solid #5B9BD5;padding:12px 16px;margin:1rem 0;border-radius:0 6px 6px 0}.zone{background:#1A1230;border:1px solid #2A1F3D;border-radius:8px;padding:12px 16px;margin:12px 0}.zone-name{color:#C8AA32;font-weight:600}</style></head><body>
+
+<h1>07 — PAULIE'S PLACE 3D WORLD</h1>
+<p><strong>Repo:</strong> <code>lovable-ai-dreamweaver</code> — new route <code>/lounge</code><br>
+<strong>Engine:</strong> Three.js WebGL, no game engine dependency<br>
+<strong>Reader model:</strong> GLM 5.2 (text-only) — <em>every scene element is described in words, no image references</em><br>
+<strong>Communicates with:</strong> PAULIS-PLACE backend via WebSocket, YAPPYVERSE-FACTORY for character assets</p>
+
+<h2>1. Purpose in one paragraph</h2>
+<p>Paulie's Place is the public 3D lounge where the Yappyverse becomes visible. Visitors open <code>yappyverse.com/lounge</code> and land inside a Seattle-2056 jazz lounge on the 47th floor of a brutalist tower, rain visible through floor-to-ceiling windows, neon in the alley below, holographic art on the walls. The avatars they see are not decorations — they are the actual agents currently working inside PAULIS-PLACE. When the Council debates on the backend, the Council characters at the round booth animate and speak the actual debate. When Pauli rules on a product launch, Pauli slams a gavel on the bar. When Zernio publishes a post, the corresponding avatar walks to the wall of screens and holds up a phone. Everything is voice-controlled — the visitor talks, Jarvis-style, and the nearest avatar responds. There are no dashboards, no SaaS chrome, no data tables. It is a game, a living cutscene, and a business simultaneously.</p>
+
+<h2>2. The camera modes and controls</h2>
+<table>
+<tr><th>Mode</th><th>Input</th><th>Camera behavior</th><th>Purpose</th></tr>
+<tr><td><strong>Enter</strong></td><td>Auto on route load</td><td>Slow cinematic push from outside the tower into the lounge, 12s</td><td>Set the world before the visitor takes control</td></tr>
+<tr><td><strong>Free-look</strong></td><td>Mouse drag on desktop / touch drag on mobile</td><td>Orbital around the room's centroid, radius 6–14m, elevation 1.4–3m</td><td>Look around without walking</td></tr>
+<tr><td><strong>Walk</strong></td><td>WASD or on-screen d-pad</td><td>First-person, walking speed 1.6m/s, no jump, collision on furniture</td><td>Move to an avatar to talk directly</td></tr>
+<tr><td><strong>Focus</strong></td><td>Voice command "look at &lt;name&gt;" or click on an avatar</td><td>Smoothly interpolate to a shoulder-height framing 2m from the target avatar, over 1.2s</td><td>Conversation framing</td></tr>
+<tr><td><strong>Cutscene</strong></td><td>Auto on <code>lounge.scene.play</code> event</td><td>Locked, cinematic, camera does what the scene dictates</td><td>Council rulings, Humans-in-the-Loop segments — the visitor watches, does not steer</td></tr>
+</table>
+
+<h2>3. The lounge layout — described exhaustively in words</h2>
+<p>The lounge is one room, roughly 20m long × 14m wide × 4m ceiling. Origin (0,0,0) at the room's center, floor level. Y is up. Room extends from x=-10 to x=+10, z=-7 to z=+7. Six named zones:</p>
+
+<div class="zone">
+<div class="zone-name">ZONE A — The Bar (north wall)</div>
+<p><strong>Position:</strong> along z=-6.5, spanning x=-8 to x=+8, height 1.1m. Behind it, a mirrored wall from y=0 to y=3.2, with 12 evenly spaced backlit bottles between x=-5 and x=+5. Behind the mirror at y=1.5m centered, one 2m × 1m embedded screen showing the current top-selling PAULIS-PLACE product. In front of the bar, 6 leather-topped stools at z=-5.5, spaced 1.4m apart from x=-3.5 to x=+3.5. <strong>Purpose:</strong> the top-of-mind product display and the "Publisher" avatar's home.</p>
+</div>
+
+<div class="zone">
+<div class="zone-name">ZONE B — The Round Booth (west wall, curved)</div>
+<p><strong>Position:</strong> centered at (-6.5, 0, 0). Curved leather bench of radius 2.2m spanning 180 degrees facing east. Round dark-wood table diameter 1.8m at seat height 0.75m. <strong>Purpose:</strong> where the Council sits during debates. Three named seats: Advocate at bearing 60°, Critic at bearing 300°, Judge (Pauli) at the center-back at bearing 0°.</p>
+</div>
+
+<div class="zone">
+<div class="zone-name">ZONE C — The Window Wall (south, floor to ceiling)</div>
+<p><strong>Position:</strong> along z=+6.5. Six glass panels 3.2m tall × 2.5m wide each. Behind the glass, the Seattle 2056 skyline — brutalist towers, rain falling continuously (particle system, ~800 particles at any moment), occasional distant lightning every 45–90 seconds. <strong>Purpose:</strong> world-building. No interactive objects.</p>
+</div>
+
+<div class="zone">
+<div class="zone-name">ZONE D — The Wall of Screens (east wall)</div>
+<p><strong>Position:</strong> along x=+9.5, from y=0.5 to y=3.5, spanning z=-5 to z=+5. Twelve 720×1280 vertical screens in a 4-row × 3-column grid. Each screen renders the current state of one of the Yappyverse Zernio accounts (Instagram, TikTok, X, YouTube, etc). <strong>Purpose:</strong> when Zernio publishes, the corresponding screen flashes and updates. The Publisher avatar walks to this wall on <code>lounge.character_posted</code> events.</p>
+</div>
+
+<div class="zone">
+<div class="zone-name">ZONE E — The Player Piano (northwest corner)</div>
+<p><strong>Position:</strong> centered at (-8.5, 0, -5.5). A small piano playing continuous ambient jazz-with-synth-bass. <strong>Purpose:</strong> ambient audio anchor. The camera never focuses here.</p>
+</div>
+
+<div class="zone">
+<div class="zone-name">ZONE F — The Center Floor (open)</div>
+<p><strong>Position:</strong> the region roughly (-4 &lt; x &lt; +4, -3 &lt; z &lt; +5). Where avatars walk between zones. Where the visitor stands after the enter animation. <strong>Purpose:</strong> free movement zone. Contains one holographic table at (0, 0.8, 2) that displays the current product being deliberated on.</p>
+</div>
+
+<h2>4. The avatars — how many, how they move, how they act</h2>
+<p>Each avatar is a Blender-rigged character loaded from <code>YAPPYVERSE-FACTORY / assets / &lt;character-id&gt;</code>. Pauli's config already exists at <code>assets/pauli/CHARACTER_CONFIG.json</code>. For the launch lineup, seven avatars are always present in the lounge, one for each PAULIS-PLACE agent role. Positions when idle:</p>
+<table>
+<tr><th>Character</th><th>Agent role</th><th>Idle position</th><th>Idle animation</th></tr>
+<tr><td>Pauli</td><td>Council Judge</td><td>Center of Zone B booth</td><td>Slow weight-shift, cigar hand</td></tr>
+<tr><td>Bambu</td><td>Autoresearch / Scanner</td><td>Bar stool 2 (Zone A)</td><td>Head down, tapping fingers</td></tr>
+<tr><td>The Advocate</td><td>Council Advocate</td><td>Zone B, bearing 60°</td><td>Gesturing while listening</td></tr>
+<tr><td>The Critic</td><td>Council Critic</td><td>Zone B, bearing 300°</td><td>Arms crossed, subtle scowl</td></tr>
+<tr><td>The Scorer</td><td>Trend scorer</td><td>Small table near Zone F holo table</td><td>Reading floating numbers</td></tr>
+<tr><td>The Designer</td><td>Design agent</td><td>Standing by Zone D screens</td><td>Sketching in the air</td></tr>
+<tr><td>The Publisher</td><td>Zernio poster</td><td>Standing between Zone D and Zone A</td><td>Holding a phone, scrolling</td></tr>
+</table>
+
+<h2>5. The scene event → avatar behavior mapping</h2>
+<p>The lounge listens to a WebSocket at <code>wss://api.paulisplace.dev/lounge/&lt;visitor-session-id&gt;</code>. Every incoming message is a <code>SceneEvent</code>:</p>
+<pre>
+SceneEvent:
+  event_id:    string
+  type:        string          # e.g. "council.debate_start", "council.advocate_speaks"
+  character:   string or null  # character-id, when the event is character-scoped
+  payload:     object          # event-specific
+  duration_ms: integer         # how long this event's animation runs
+</pre>
+
+<p>The event → behavior table:</p>
+<table>
+<tr><th>Event type</th><th>Behavior</th></tr>
+<tr><td><code>council.debate_start</code></td><td>Camera pushes to Zone B. All three council avatars turn toward the table. Holo table at (0, 0.8, 2) lights up with the topic.</td></tr>
+<tr><td><code>council.advocate_speaks</code></td><td>Advocate character animates <code>speaking</code>, gestures. ElevenLabs stream plays. Lip-sync driven by amplitude envelope of the stream.</td></tr>
+<tr><td><code>council.critic_speaks</code></td><td>Advocate animation returns to idle. Critic animates <code>attacking</code> — leans forward, gestures with pointed finger. Voice plays.</td></tr>
+<tr><td><code>council.judge_rules</code></td><td>Pauli stands, walks to the bar (Zone A), grabs a small brass bell, taps it once. Sound plays. On-screen text (Zone D center screen) reads the ruling.</td></tr>
+<tr><td><code>lounge.character_posted</code></td><td>Publisher avatar walks from idle position to Zone D, faces the screen matching the platform in the event payload, raises phone. Screen flashes and updates with the post preview.</td></tr>
+<tr><td><code>revenue.product_created</code></td><td>Designer avatar walks to Zone F holo table. Product image materializes above the table. Designer animates <code>presenting</code>.</td></tr>
+<tr><td><code>payment.settled</code></td><td>All avatars turn to Zone A. Bell rings twice. Bar's top-of-mind product screen flashes green for 2s.</td></tr>
+<tr><td><code>humans.in_the_loop_cue</code></td><td>Cutscene mode. Room dims. A phone-shaped viewport rises at (0, 1.5, 2). The Humans in the Loop clip plays inside it. On completion, mode returns to Free-look.</td></tr>
+<tr><td><code>visitor.voice_command</code></td><td>Handled by subsystem 08. Nearest avatar orients to visitor, animates <code>attentive</code>, and speaks the response.</td></tr>
+</table>
+
+<h2>6. Real expression — the animation stack</h2>
+<p>Each character has three animation layers that blend continuously:</p>
+<ol>
+<li><strong>Body layer</strong> — one of idle | walking | speaking | attacking | presenting | attentive | sitting | drinking. Cross-fades in 0.35s.</li>
+<li><strong>Face layer</strong> — driven by an <em>emotional intent</em> field on every scene event: <code>neutral | curious | confident | frustrated | delighted | conspiratorial</code>. Blendshape weights mapped in <code>icm/context/FACE_BLENDSHAPES.md</code>. Cross-fades in 0.5s.</li>
+<li><strong>Lip layer</strong> — real-time amplitude-driven when an ElevenLabs stream is playing. Otherwise, closed-mouth. Recomputed every audio frame (~20ms).</li>
+</ol>
+
+<h2>7. Blender pipeline for new characters</h2>
+<p>New characters follow the pipeline already established in YAPPYVERSE-FACTORY:</p>
+<ol>
+<li>Reference image goes into <code>assets/&lt;id&gt;/reference/</code>.</li>
+<li>TripoSR (or Replicate fallback) generates the mesh into <code>assets/&lt;id&gt;/mesh/</code>.</li>
+<li>Auto-rig via <code>scripts/auto_rig.py</code> using Blender 5.0 headless. Rig type Rigify. Custom bones for hat/chain/cigar as declared in CHARACTER_CONFIG.</li>
+<li>Bake standard animation set (idle, walking, speaking, attacking, presenting, attentive) via <code>scripts/pipeline.py --character &lt;id&gt;</code>.</li>
+<li>Export glTF with Draco compression to <code>assets/&lt;id&gt;/webgl/character.glb</code>. Target file size &lt; 6MB per character.</li>
+</ol>
+
+<h2>8. Loading and streaming budget</h2>
+<div class="warn">
+The 3D world must be interactive within 4 seconds on a modern desktop, 8 seconds on mobile. Enforce these budgets:
+<ul>
+<li>Initial JS bundle for <code>/lounge</code>: &lt; 400KB gzipped</li>
+<li>First scene render: room geometry + Pauli only. Other characters stream in over the next 5 seconds.</li>
+<li>Textures: 1024×1024 max on desktop, 512×512 on mobile</li>
+<li>Total asset budget for the lounge: 40MB desktop, 18MB mobile</li>
+<li>No character glTF is loaded until the visitor's camera has been idle in Free-look mode for at least 1.5s</li>
+</ul>
+</div>
+
+<h2>9. The rendering aesthetic (design law)</h2>
+<p>The visual language is Pauli's CHARACTER_CONFIG palette applied to the whole world:</p>
+<ul>
+<li>Background / ambient: <code>#140F1E</code> deep purple-black</li>
+<li>Neutral surfaces (walls, ceiling, wood): warm dark grays with a subtle purple tint</li>
+<li>Accent lighting: <code>#FF6432</code> fire orange, used for spotlights over Zone B, neon signs in the alley, and rim lighting on speaking characters</li>
+<li>Gold trims and highlights: <code>#C8AA32</code></li>
+<li>Text on screens and holograms: <code>#E6DCFF</code> lavender white</li>
+</ul>
+<p><strong>No glassmorphism. No backdrop-blur cards. No gradient text.</strong> Every UI overlay uses solid fills. Every 3D material uses PBR with sensible roughness. Bar wood is rough (0.85). Metal (chain, bar rail) is polished (0.15). Windows are refractive glass.</p>
+
+<h2>10. Acceptance criteria</h2>
+<ol>
+<li>Route <code>/lounge</code> renders the 6 zones as described in section 3, dimensions verified with a debug-mode overlay.</li>
+<li>All 7 launch avatars load in the correct idle positions and animate their idle loops.</li>
+<li>Every event type in section 5 has a scene handler with a matching name in the code.</li>
+<li>Voice commands (subsystem 08) reach the nearest avatar and trigger the <code>attentive</code> animation.</li>
+<li>Load budgets in section 8 are met in a Lighthouse mobile test.</li>
+<li>Rendering aesthetic (section 9) passes a manual review — no glass cards, no gradient text, palette matches.</li>
+<li>The WebSocket connection auto-reconnects with exponential backoff (1s, 2s, 4s, 8s, 16s, then 30s).</li>
+</ol>
+
+<p>Downstream: read <a href="08_voice_control_jarvis.html">08_voice_control_jarvis.html</a> for the voice interaction contract.</p>
+
+</body></html>

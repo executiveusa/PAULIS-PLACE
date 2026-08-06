@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>06 — PAYMENTS AND LEDGER</title>
+<style>body{font-family:ui-monospace,Menlo,monospace;max-width:1100px;margin:2rem auto;padding:0 1.5rem;background:#0A0714;color:#E6DCFF;line-height:1.65;font-size:15px}h1,h2,h3{color:#FF6432;font-family:Georgia,serif;font-style:italic;font-weight:500}h1{border-bottom:2px solid #C8AA32;padding-bottom:.5rem}h2{border-bottom:1px solid #2A1F3D;padding-bottom:.3rem;margin-top:2rem}code{background:#1E1035;color:#C8AA32;padding:2px 6px;border-radius:3px;font-size:.9em}pre{background:#140F1E;border:1px solid #2A1F3D;padding:1rem;border-radius:6px;overflow-x:auto;font-size:.85em}table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.9em}th,td{border:1px solid #2A1F3D;padding:8px 12px;text-align:left;vertical-align:top}th{background:#1A1230;color:#C8AA32}tr:nth-child(even) td{background:#140F1E}.warn{background:#3A0A0A;border-left:4px solid #E05A5A;padding:12px 16px;margin:1rem 0;border-radius:0 6px 6px 0}</style></head><body>
+
+<h1>06 — PAYMENTS AND LEDGER</h1>
+<p><strong>Repo:</strong> <code>PAULIS-PLACE</code>, module <code>backend/services/payment_service.py</code> (exists), plus new <code>ledger_service.py</code><br>
+<strong>Reader model:</strong> GLM 5.2 (text-only)</p>
+
+<h2>1. Purpose</h2>
+<p>Two gateways: Creem for USD cards, BTCPay for Bitcoin and Lightning. No other gateways. Every settled payment triggers a chain: (a) grant access to the paid artifact, (b) append a row to the internal ledger, (c) dispatch a scene event to the 3D world so Pauli rings the bell, (d) if the total daily settled revenue crosses a threshold, dispatch a Zernio celebration post (Publisher character). Reconciliation runs hourly.</p>
+
+<h2>2. Webhook contracts</h2>
+<table>
+<tr><th>Gateway</th><th>Webhook URL</th><th>Signature header</th><th>Event we care about</th></tr>
+<tr><td>Creem</td><td><code>POST /webhooks/creem</code></td><td><code>X-Creem-Signature</code> HMAC-SHA256</td><td><code>checkout.settled</code></td></tr>
+<tr><td>BTCPay</td><td><code>POST /webhooks/btcpay</code></td><td><code>BTCPay-Sig</code> HMAC-SHA256</td><td><code>InvoiceSettled</code></td></tr>
+</table>
+<div class="warn">
+Both webhooks MUST verify the signature before doing anything with the payload. Unsigned or invalid-signature requests are logged to <code>icm/memory/ops/&lt;date&gt;/webhook_rejected.jsonl</code> and return 200 OK (never leak the rejection reason to a bad actor). A run of 10+ invalid signatures in an hour trips a circuit breaker and emits <code>ops.webhook_attack_suspected</code>.
+</div>
+
+<h2>3. The event chain per settlement</h2>
+<ol>
+<li>Webhook arrives → signature verified → payload extracted.</li>
+<li>Idempotency check: has this <code>invoice_id</code> already been processed? Redis SETNX with 24h TTL. If already processed, return 200 OK and stop.</li>
+<li>Emit <code>payment.settled</code> to the bus with <code>{gateway, invoice_id, amount_usd, currency, product_id, buyer_email or null, correlation_id}</code>.</li>
+<li>Access grant worker (subsystem 03 role) receives the event and marks the buyer's access rights in the product access table.</li>
+<li>Ledger append worker writes a row to <code>backend/db/ledger</code>.</li>
+<li>Scene event <code>lounge.payment_celebration</code> fires — Pauli rings the bar bell twice (subsystem 07).</li>
+<li>Daily threshold check: if today's total crossed a threshold (default $100, $500, $1000), dispatch a Zernio celebration post via subsystem 05.</li>
+</ol>
+
+<h2>4. The ledger schema (Postgres)</h2>
+<pre>
+CREATE TABLE ledger_entries (
+  id                bigserial PRIMARY KEY,
+  occurred_at       timestamptz NOT NULL,
+  gateway           text NOT NULL,               -- 'creem' | 'btcpay'
+  invoice_id        text NOT NULL UNIQUE,        -- prevents double-writes
+  product_id        text NOT NULL,
+  amount_usd        numeric(12,2) NOT NULL,
+  currency_original text NOT NULL,               -- e.g. 'USD', 'BTC'
+  amount_original   numeric(24,8) NOT NULL,
+  fx_rate           numeric(18,8),               -- USD per unit of original currency
+  buyer_hash        text,                        -- SHA-256 of buyer email, never the email itself
+  correlation_id    text NOT NULL,
+  payload_json      jsonb NOT NULL,              -- full webhook payload for audit
+  created_at        timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX ledger_occurred_at_idx ON ledger_entries (occurred_at DESC);
+CREATE INDEX ledger_product_idx     ON ledger_entries (product_id);
+</pre>
+
+<h2>5. Reconciliation loop (hourly)</h2>
+<p>Cron on the hour. For each gateway, list settled invoices in the last 2 hours and cross-check against the ledger. Any settled invoice not in the ledger triggers <code>ops.reconciliation_gap</code> and is retried through the event chain (with idempotency, so it self-heals).</p>
+
+<h2>6. Refunds</h2>
+<p>Refund handling is human-gated. A refund event does not automatically revoke access — it emits <code>ops.refund_pending</code> and waits for the human's voice command in the lounge ("Revoke access for order X") before revoking.</p>
+
+<h2>7. Acceptance criteria</h2>
+<ol>
+<li>Both webhook signatures are verified with real HMAC checks; a unit test with a known-bad signature returns 200 OK but does not process.</li>
+<li>Idempotency prevents double-processing under a concurrent duplicate webhook (test with two identical POSTs).</li>
+<li>Ledger schema exists and every field is populated.</li>
+<li>Reconciliation gap self-heals within one hour under a simulated missed webhook.</li>
+<li>Refunds do not automatically revoke; a lounge command is required.</li>
+</ol>
+
+</body></html>

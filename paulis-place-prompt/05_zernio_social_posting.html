@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>05 — ZERNIO SOCIAL POSTING</title>
+<style>body{font-family:ui-monospace,Menlo,monospace;max-width:1100px;margin:2rem auto;padding:0 1.5rem;background:#0A0714;color:#E6DCFF;line-height:1.65;font-size:15px}h1,h2,h3{color:#FF6432;font-family:Georgia,serif;font-style:italic;font-weight:500}h1{border-bottom:2px solid #C8AA32;padding-bottom:.5rem}h2{border-bottom:1px solid #2A1F3D;padding-bottom:.3rem;margin-top:2rem}code{background:#1E1035;color:#C8AA32;padding:2px 6px;border-radius:3px;font-size:.9em}pre{background:#140F1E;border:1px solid #2A1F3D;padding:1rem;border-radius:6px;overflow-x:auto;font-size:.85em}table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.9em}th,td{border:1px solid #2A1F3D;padding:8px 12px;text-align:left;vertical-align:top}th{background:#1A1230;color:#C8AA32}tr:nth-child(even) td{background:#140F1E}.step{margin:1rem 0;padding-left:1rem;border-left:2px solid #C8AA32}.step-id{color:#C8AA32;font-family:ui-monospace,monospace;font-size:.75em}.step-title{color:#E6DCFF;font-weight:600;margin:2px 0 6px}.warn{background:#3A0A0A;border-left:4px solid #E05A5A;padding:12px 16px;margin:1rem 0;border-radius:0 6px 6px 0}.info{background:#0A1E3A;border-left:4px solid #5B9BD5;padding:12px 16px;margin:1rem 0;border-radius:0 6px 6px 0}</style></head><body>
+
+<h1>05 — ZERNIO SOCIAL POSTING</h1>
+<p><strong>Repo:</strong> <code>PAULIS-PLACE</code> — new module <code>backend/services/zernio_service.py</code>, wired into <code>revenue_tasks.py</code><br>
+<strong>Dispatched by:</strong> Hermes on any <code>revenue.product_created</code>, <code>revenue.channel_output_ready</code>, <code>lounge.humans_in_the_loop_clip_ready</code> event<br>
+<strong>Reader model:</strong> GLM 5.2 (text-only)</p>
+
+<h2>1. Purpose</h2>
+<p>Zernio is the outbound social-posting rail for the whole Yappyverse. Every revenue event that has a shareable artifact — a product listing, a Council ruling clip, a Humans-in-the-Loop segment, an ebook cover — gets auto-posted to the relevant subset of Zernio's 15+ platforms. Every avatar has its own posting persona bound to specific accountIds. Zernio owns the schedule, retries, and platform-specific formatting. Hermes owns whether to post at all.</p>
+
+<h2>2. Zernio, in one paragraph, for the reader who has never seen it</h2>
+<p>Zernio is a REST API at <code>https://zernio.com/api/v1</code> that publishes and schedules posts to Instagram, TikTok, YouTube, LinkedIn, X, Threads, Reddit, Pinterest, Bluesky, WhatsApp, Facebook, Google Business, Telegram, Snapchat, Discord (15+ platforms). Auth is a bearer key (<code>ZERNIO_API_KEY</code>) obtained through a device-authorization flow at <code>https://zernio.com/auth.md</code>. The Node SDK is <code>@zernio/node</code>; the Python SDK is <code>zernio-sdk</code>. Every post targets one or more <em>connected accounts</em> — each has an <code>accountId</code> discoverable through <code>accounts.list()</code>. A post has <code>content</code>, an array of <code>{platform, accountId}</code>, and optionally a <code>scheduledFor</code> ISO-8601 timestamp. The response wraps the created post under <code>data.post</code> with a Mongo-style <code>_id</code>. All of these SDK method names and field names are exact — do not paraphrase them.</p>
+
+<h2>3. The auth flow — do this once</h2>
+<div class="step"><div class="step-id">STEP 05.3.1</div><div class="step-title">Check for existing key</div>
+Before initiating auth, check <code>ZERNIO_API_KEY</code> in env and in <code>.env</code>. If present, skip to section 4. Do not mint a second key.</div>
+
+<div class="step"><div class="step-id">STEP 05.3.2</div><div class="step-title">Initiate device auth</div>
+POST to <code>https://zernio.com/api/auth/cli/initiate</code> with JSON body <code>{"deviceName": "PAULIS-PLACE Setup"}</code>. Response fields: <code>deviceCode</code>, <code>userCode</code>, <code>browserUrl</code>, <code>expiresAt</code>, <code>interval</code>. Keep <code>deviceCode</code> secret — it is the polling credential.</div>
+
+<div class="step"><div class="step-id">STEP 05.3.3</div><div class="step-title">Human authorizes in browser</div>
+Show the <code>browserUrl</code> to the human. They open it, sign in or sign up, click Authorize. This is the only manual step in the whole system's posting setup.</div>
+
+<div class="step"><div class="step-id">STEP 05.3.4</div><div class="step-title">Poll until authorized</div>
+GET <code>https://zernio.com/api/auth/cli/poll</code> with <code>Authorization: Bearer &lt;deviceCode&gt;</code>. Must be GET, not POST — POST returns 405. Poll interval is <code>interval</code> seconds, minimum 5. Status transitions: <code>pending</code> → <code>authorized</code> (with <code>apiKey</code> field, returned exactly once) → subsequent polls return <code>authorized</code> with no key. On 410, session expired, restart from STEP 05.3.2.</div>
+
+<div class="step"><div class="step-id">STEP 05.3.5</div><div class="step-title">Persist the key immediately, before anything else</div>
+The moment the poll returns <code>{"status":"authorized","apiKey":"sk_..."}</code>, write it to <code>.env</code>:
+<pre>ZERNIO_API_KEY=sk_...</pre>
+Confirm <code>.env</code> is in <code>.gitignore</code>. Never print the key. Never commit it. If you poll again before persisting, the key is gone forever — restart from STEP 05.3.2.</div>
+
+<h2>4. SDK initialization</h2>
+<div class="warn">
+The SDK names, method names, and request field names are exact and must not be paraphrased. Node: <code>@zernio/node</code>, method <code>posts.createPost</code>, args nested under <code>body</code>, response nested under <code>data.post._id</code>. Python: <code>zernio-sdk</code>, method <code>posts.create</code>, snake_case kwargs, response nested under <code>result["post"]["_id"]</code>. The REST field is <code>content</code>, not <code>text</code>. Do not guess variants.
+</div>
+
+<p>PAULIS-PLACE is Python. Use <code>zernio-sdk</code>. Initialize once at import time:</p>
+<pre>
+from zernio import Zernio
+client = Zernio()  # reads ZERNIO_API_KEY from env
+</pre>
+
+<h2>5. The account discovery workflow — do this at boot and cache</h2>
+<div class="step"><div class="step-id">STEP 05.5.1</div><div class="step-title">List accounts on service boot</div>
+Call <code>client.accounts.list()</code>. Iterate the returned <code>accounts</code>. Build a lookup: <code>{platform: [accountId, ...]}</code>. Persist to Redis under key <code>zernio:accounts:v1</code>, TTL 1 hour.</div>
+
+<div class="step"><div class="step-id">STEP 05.5.2</div><div class="step-title">Map accounts to Yappyverse personas</div>
+The character-to-account mapping lives in <code>icm/context/ZERNIO_PERSONAS.md</code>. Format:
+<pre>
+| character | platform  | accountId | posting_voice_prompt_path |
+| pauli     | instagram | acc_xxx   | icm/instructions/VOICE_PAULI.md |
+| pauli     | tiktok    | acc_yyy   | icm/instructions/VOICE_PAULI.md |
+| bambu     | linkedin  | acc_zzz   | icm/instructions/VOICE_BAMBU.md |
+</pre>
+If a persona references an accountId not in the discovery cache, log a warning and skip that platform for that persona — do not error out the whole run.</div>
+
+<h2>6. The post-creation pipeline — one revenue event → many social posts</h2>
+
+<div class="step"><div class="step-id">STEP 05.6.1</div><div class="step-title">Hermes emits an outbound event</div>
+Example event types that trigger this subsystem: <code>revenue.product_created</code>, <code>revenue.channel_output_ready</code>, <code>lounge.humans_in_the_loop_clip_ready</code>, <code>council.ruling_clip_ready</code>. Payload includes the artifact and its character context.</div>
+
+<div class="step"><div class="step-id">STEP 05.6.2</div><div class="step-title">Select target platforms per persona rules</div>
+Read <code>icm/context/PLATFORM_MATCH.md</code>. Example rules: sticker products → Pinterest + Instagram + TikTok. Ebook launches → X + Threads + Reddit + Instagram. Humans-in-the-Loop clips → TikTok + YouTube Shorts + Instagram Reels. Micro-app launches → LinkedIn + X + Threads + Reddit.</div>
+
+<div class="step"><div class="step-id">STEP 05.6.3</div><div class="step-title">Draft post content — dispatch to a worker</div>
+For each target platform, Hermes dispatches a <code>write_short</code> profile call with the platform-specific prompt at <code>icm/instructions/POSTING/&lt;platform&gt;.md</code>. Prompt includes the persona voice, the artifact URL, the platform character limit, and the platform-native format cues (hashtags for IG, thread-style for X, hook + payoff for TikTok).</div>
+
+<div class="step"><div class="step-id">STEP 05.6.4</div><div class="step-title">Judge the draft against the RUTHLESS style law</div>
+The <code>judge</code> profile validates: no banned words (delve, tapestry, realm, seamless, robust, innovative, elevate), no em-dashes for emphasis, character length within platform limit, hook exists in first line, product link is intact. Reject → correction loop per Hermes subsystem 01 STEP 01.5.7.</div>
+
+<div class="step"><div class="step-id">STEP 05.6.5</div><div class="step-title">Schedule or publish via Zernio</div>
+Python:
+<pre>
+result = client.posts.create(
+    content=drafted_text,
+    platforms=[{"platform": "instagram", "accountId": "acc_xxx"}],
+    scheduled_for="2026-08-07T18:00:00Z",  # optional
+)
+post_id = result["post"]["_id"]
+</pre>
+Store the returned <code>_id</code> in <code>icm/memory/ops/&lt;date&gt;/&lt;correlation_id&gt;/zernio_posts.jsonl</code>.</div>
+
+<div class="step"><div class="step-id">STEP 05.6.6</div><div class="step-title">Emit lounge event</div>
+Publish <code>lounge.character_posted</code> with <code>{character, platform, post_id, artifact_url}</code>. Subsystem 07 uses this to animate the character in the 3D world holding up a phone showing the post.</div>
+
+<h2>7. Rate limiting and cost guards</h2>
+<table>
+<tr><th>Guard</th><th>Limit</th><th>Action on breach</th></tr>
+<tr><td>Posts per persona per day</td><td>4 per platform</td><td>Skip additional posts, log <code>zernio.rate_limited_soft</code></td></tr>
+<tr><td>Total draft-worker cost per day</td><td>$1.00</td><td>Halt drafting, use last known good template variants for remaining posts</td></tr>
+<tr><td>Failed publishes in a row</td><td>3</td><td>Circuit breaker: pause Zernio subsystem for 30 minutes, alert human</td></tr>
+<tr><td>Judge rejects for one draft</td><td>3</td><td>Skip this platform for this artifact — do not force a bad post</td></tr>
+</table>
+
+<h2>8. Scheduling philosophy</h2>
+<p>Do not publish immediately for most events. Use <code>scheduledFor</code> to spread posts across the target platform's known-good windows (defined per platform in <code>icm/context/PLATFORM_SCHEDULE.md</code>). Immediate publish is reserved for <code>lounge.humans_in_the_loop_clip_ready</code> (time-sensitive comedy) and <code>council.ruling_clip_ready</code> (audience is watching live).</p>
+
+<h2>9. Zernio's LLM-readable surface</h2>
+<p>For endpoint discovery beyond posts (media uploads, inbox, analytics, ads), the machine-readable surface is at <code>https://zernio.com/llms.txt</code> and the OpenAPI is at <code>https://zernio.com/openapi.yaml</code>. Read one of these before adding a new Zernio capability — do not guess endpoint shapes.</p>
+
+<h2>10. Acceptance criteria</h2>
+<ol>
+<li><code>ZERNIO_API_KEY</code> is present in <code>.env</code>, and <code>.env</code> is in <code>.gitignore</code>. Grep for the key in git history returns nothing.</li>
+<li>The 5 event types in STEP 05.6.1 each trigger the pipeline in an integration test.</li>
+<li>The RUTHLESS judge (STEP 05.6.4) has a unit test per banned word — a draft containing any of them fails.</li>
+<li>The rate limits in section 7 are enforced with Redis counters.</li>
+<li>Zernio post IDs are persisted per correlation_id in <code>icm/memory/ops/</code>.</li>
+<li>The lounge event in STEP 05.6.6 fires after every successful publish and is received by subsystem 07.</li>
+</ol>
+
+</body></html>

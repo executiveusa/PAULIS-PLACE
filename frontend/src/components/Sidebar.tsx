@@ -11,7 +11,8 @@ import {
   Zap,
   DollarSign,
   Brain,
-  Eye
+  Eye,
+  Music,
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -22,6 +23,7 @@ const navItems = [
   { href: '/queue', label: 'Approval Queue', icon: ClipboardCheck },
   { href: '/research', label: 'Research Lab', icon: Brain },
   { href: '/observation', label: 'Observation', icon: Eye },
+  { href: '/lounge', label: "Paulie's Place 3D", icon: Music },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -36,8 +38,8 @@ export function Sidebar() {
             <Zap className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="font-bold text-lg">DigiFactory</h1>
-            <p className="text-xs text-gray-400">Autonomous Products</p>
+            <h1 className="font-bold text-lg">Paulie's Place</h1>
+            <p className="text-xs text-gray-400">Yappyverse Factory</p>
           </div>
         </div>
       </div>
@@ -72,7 +74,7 @@ export function Sidebar() {
           <div className="mt-1 text-2xl font-bold text-white">
             $<CostDisplay />
           </div>
-          <div className="mt-1 text-xs text-gray-500">Limit: $10.00/day</div>
+          <div className="mt-1 text-xs text-gray-500">Limit: $25.00/day</div>
         </div>
       </div>
     </aside>

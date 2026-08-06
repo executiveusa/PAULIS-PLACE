@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>09 — SELF-IMPROVEMENT LOOP</title>
+<style>body{font-family:ui-monospace,Menlo,monospace;max-width:1100px;margin:2rem auto;padding:0 1.5rem;background:#0A0714;color:#E6DCFF;line-height:1.65;font-size:15px}h1,h2,h3{color:#FF6432;font-family:Georgia,serif;font-style:italic;font-weight:500}h1{border-bottom:2px solid #C8AA32;padding-bottom:.5rem}h2{border-bottom:1px solid #2A1F3D;padding-bottom:.3rem;margin-top:2rem}code{background:#1E1035;color:#C8AA32;padding:2px 6px;border-radius:3px;font-size:.9em}pre{background:#140F1E;border:1px solid #2A1F3D;padding:1rem;border-radius:6px;overflow-x:auto;font-size:.85em}table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.9em}th,td{border:1px solid #2A1F3D;padding:8px 12px;text-align:left;vertical-align:top}th{background:#1A1230;color:#C8AA32}tr:nth-child(even) td{background:#140F1E}</style></head><body>
+
+<h1>09 — SELF-IMPROVEMENT LOOP</h1>
+<p><strong>Repo:</strong> <code>pauli-hermes-agent</code>, module <code>src/improve/nightly.ts</code><br>
+<strong>Reader model:</strong> GLM 5.2 (text-only)</p>
+
+<h2>1. Purpose</h2>
+<p>Every night at 03:00 UTC, Hermes reads yesterday's ops reports and pattern candidates, scores the day against the Meadows 12-axis framework, and produces a small number of proposed changes as GitHub PRs. Each PR touches at most one subsystem. Humans review and merge. This is the compound-learning loop — without it, the system does not get smarter.</p>
+
+<h2>2. The nightly steps</h2>
+<ol>
+<li><strong>Aggregate.</strong> Read all files in <code>icm/memory/ops/&lt;yesterday&gt;/</code>. Compute per-agent stats: run count, correction rate, cost total, gate violation rate.</li>
+<li><strong>Score.</strong> For each Meadows axis (Feedback Completeness, Blast Radius Control, etc.) compute yesterday's score.</li>
+<li><strong>Compare.</strong> Diff against 7-day rolling average. Any axis that dropped by more than 0.5 is a candidate for a fix.</li>
+<li><strong>Propose.</strong> Dispatch to a <code>plan</code> profile worker: given the axis that dropped and the ops reports for context, propose one specific change. Output is a PR-shaped envelope with target repo, target files, rationale, and expected axis lift.</li>
+<li><strong>Judge.</strong> Judge on a different model — is the change worth its cost? Does it address the axis? Blast radius ≤ 3?</li>
+<li><strong>Promote patterns.</strong> Any decision that appeared 3+ times in the last 30 days without contradiction gets promoted to <code>icm/memory/patterns/&lt;slug&gt;.md</code>. Every subsequent agent read this before its own run.</li>
+<li><strong>Open the PR.</strong> Via GitHub API. Assign to a human reviewer. Never merge automatically.</li>
+</ol>
+
+<h2>3. Guardrails</h2>
+<ol>
+<li>No more than 3 PRs opened per night. If more candidates exist, keep them for later nights.</li>
+<li>PRs that touch <code>icm/instructions/</code> require two human reviewers.</li>
+<li>PRs that touch payment code (subsystem 06) or Hermes core (subsystem 01) require three reviewers.</li>
+<li>Any PR that would regress a Meadows axis by more than 0.3 is voided by the judge.</li>
+</ol>
+
+<h2>4. Acceptance criteria</h2>
+<ol>
+<li>Nightly cron exists and produces the aggregate + score files.</li>
+<li>Meadows score is computed on 12 axes with declared weights.</li>
+<li>The PR-open path uses GitHub API with human assignment.</li>
+<li>Pattern promotion has a unit test with 3 identical decisions producing a pattern file.</li>
+</ol>
+
+</body></html>

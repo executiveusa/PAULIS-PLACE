@@ -8,13 +8,29 @@ from models.trend import Trend
 from models.research import NicheInsight
 from api import dashboard, products, tasks, approvals
 from api import research_lab, payments, council, memory
+from api import health as health_api
+from api import voice as voice_api
+from api import printing_press as pp_api
+from services import hermes as hermes_service
+from services import event_bus as event_bus_service
+from agents import council_adversarial, voice_router, sssf
+from services import zernio_service, ledger_service
 from workers.tasks import scan_all_trends, score_hot_trends, create_products_from_trends
 from workers.boot_task import boot_system
 import json
 from datetime import datetime, timezone
 
-# Create tables
-Base.metadata.create_all(bind=engine)
+# Wire Yappyverse event subscribers at import time (idempotent)
+council_adversarial.register()
+voice_router.register()
+sssf.register_subscribers()
+zernio_service.register()
+
+# Create tables (best-effort: skip if DB unreachable in dev)
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as _e:
+    print(f"[main] db.create_all skipped (dev ok): {type(_e).__name__}")
 
 app = FastAPI(title="DigiFactory API", version="1.0.0")
 
@@ -36,6 +52,9 @@ app.include_router(research_lab.router, tags=["research_lab"])
 app.include_router(payments.router, tags=["payments"])
 app.include_router(council.router, tags=["council"])
 app.include_router(memory.router, tags=["memory"])
+app.include_router(health_api.router, tags=["health"])
+app.include_router(voice_api.router, tags=["voice"])
+app.include_router(pp_api.router, tags=["printing-press"])
 
 # WebSocket for real-time updates
 class ConnectionManager:
@@ -62,12 +81,22 @@ manager = ConnectionManager()
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
+    event_bus_service.register_websocket(websocket)
     try:
         while True:
             data = await websocket.receive_text()
-            # Handle any client messages if needed
+            # Allow client to subscribe to specific routes (optional)
+            try:
+                msg = json.loads(data)
+                if msg.get("type") == "replay" and msg.get("event_id"):
+                    env = event_bus_service.replay(msg["event_id"])
+                    if env:
+                        await websocket.send_json({"type": "replay", "envelope": env})
+            except Exception:
+                pass
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+        event_bus_service.unregister_websocket(websocket)
 
 
 # Manual triggers

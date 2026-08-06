@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>02 — ADVERSARIAL COUNCIL</title>
+<style>body{font-family:ui-monospace,Menlo,monospace;max-width:1100px;margin:2rem auto;padding:0 1.5rem;background:#0A0714;color:#E6DCFF;line-height:1.65;font-size:15px}h1,h2,h3{color:#FF6432;font-family:Georgia,serif;font-style:italic;font-weight:500}h1{border-bottom:2px solid #C8AA32;padding-bottom:.5rem}h2{border-bottom:1px solid #2A1F3D;padding-bottom:.3rem;margin-top:2rem}code{background:#1E1035;color:#C8AA32;padding:2px 6px;border-radius:3px;font-size:.9em}pre{background:#140F1E;border:1px solid #2A1F3D;padding:1rem;border-radius:6px;overflow-x:auto;font-size:.85em}table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.9em}th,td{border:1px solid #2A1F3D;padding:8px 12px;text-align:left;vertical-align:top}th{background:#1A1230;color:#C8AA32}tr:nth-child(even) td{background:#140F1E}.step{margin:1rem 0;padding-left:1rem;border-left:2px solid #C8AA32}.step-id{color:#C8AA32;font-family:ui-monospace,monospace;font-size:.75em}.step-title{color:#E6DCFF;font-weight:600;margin:2px 0 6px}.warn{background:#3A0A0A;border-left:4px solid #E05A5A;padding:12px 16px;margin:1rem 0;border-radius:0 6px 6px 0}.info{background:#0A1E3A;border-left:4px solid #5B9BD5;padding:12px 16px;margin:1rem 0;border-radius:0 6px 6px 0}</style></head><body>
+
+<h1>02 — ADVERSARIAL COUNCIL</h1>
+<p><strong>Repo:</strong> <code>PAULIS-PLACE</code> — adds to <code>adws/adw_council_debate.py</code><br>
+<strong>Dispatched by:</strong> Hermes (subsystem 01) when a <code>council.debate_request</code> event arrives<br>
+<strong>Reader model:</strong> GLM 5.2 (text-only)</p>
+
+<h2>1. Purpose</h2>
+<p>Every non-trivial decision in Paulie's Place goes through the Council — a three-turn structured debate that produces a locked ruling. This is the adversarial-check discipline from the Tracer transcript, applied to business decisions rather than code review. The Advocate argues for the action. The Critic tears the argument down. The Judge synthesizes and rules. The Judge is on a different model than the Advocate and Critic — never let one model referee its own reasoning.</p>
+
+<h2>2. The three turns</h2>
+<table>
+<tr><th>Turn</th><th>Role</th><th>Task profile</th><th>Preferred model 2026</th><th>Cost target</th></tr>
+<tr><td>1</td><td><strong>Advocate</strong> — make the strongest case FOR the action. 3 real examples of this working. Explicit ROI estimate. Named risks and mitigations.</td><td><code>write_long</code></td><td>Llama 3.1 8B / GLM 5.2 fast</td><td>≤ $0.05</td></tr>
+<tr><td>2</td><td><strong>Critic</strong> — attack the advocate's case. Find oversaturation, platform risk, cost creep, TTFD &gt; 14 days. Never accept the advocate's numbers without a counter.</td><td><code>write_long</code></td><td>Qwen 3.5 32B / GLM 4.6 medium thinking</td><td>≤ $0.08</td></tr>
+<tr><td>3</td><td><strong>Judge</strong> — synthesize, rule proceed / reject / revise. If proceed: emit the final one-paragraph product brief. If revise: name the exact change. If reject: name the better alternative.</td><td><code>judge</code></td><td>Claude Fable 5 or Kimi K3 (different model than turns 1 & 2)</td><td>≤ $0.10</td></tr>
+</table>
+
+<h2>3. The envelope schema</h2>
+<pre>
+CouncilRulingEnvelope:
+  correlation_id:      string
+  topic:               string                       # what was being debated
+  advocate_argument:   string, min 200 chars
+  critic_argument:     string, min 200 chars
+  judge_ruling:        enum ("proceed" | "reject" | "revise")
+  judge_reasoning:     string, min 100 chars
+  final_brief:         string or null               # populated only if proceed
+  next_action:         string or null               # populated only if revise
+  alternative:         string or null               # populated only if reject
+  confidence:          float 0..1
+  time_to_first_dollar_days:  integer or null
+  estimated_roi_30d:   float or null
+</pre>
+
+<h2>4. The four hard rules</h2>
+<div class="warn">
+<ol>
+<li><strong>Judge cannot be the same model as advocate or critic.</strong> Enforced by the gateway (subsystem 01 section 6). If the pool cannot provide a distinct judge model, halt.</li>
+<li><strong>Judge does not start with "proceed" unless the advocate survived the critic's attack.</strong> Encoded in the judge's system prompt at <code>icm/instructions/COUNCIL_JUDGE.md</code> as an assertion the judge must reason about explicitly before answering.</li>
+<li><strong>Reject requires an alternative.</strong> A judge that rejects without naming a better opportunity is emitting an unusable envelope — Hermes returns it as a violation.</li>
+<li><strong>Time-to-first-dollar must be under 14 days OR the ruling is <em>revise</em>, not <em>proceed</em>.</strong> Long-payoff bets are legitimate but they are not <em>proceed</em>-eligible without an explicit human override.</li>
+</ol>
+</div>
+
+<h2>5. The debate flow — 6 steps</h2>
+
+<div class="step"><div class="step-id">STEP 02.5.1</div><div class="step-title">Hermes emits council.debate_request</div>
+Payload includes: <code>topic</code>, <code>context_document_path</code>, <code>correlation_id</code>, <code>max_total_cost_usd</code> (default $0.25).</div>
+
+<div class="step"><div class="step-id">STEP 02.5.2</div><div class="step-title">Advocate turn</div>
+Worker loads <code>icm/instructions/COUNCIL_ADVOCATE.md</code>, produces an <code>AdvocateEnvelope</code>. If min-char count fails, Hermes corrects in-session.</div>
+
+<div class="step"><div class="step-id">STEP 02.5.3</div><div class="step-title">Critic turn</div>
+Worker loads <code>icm/instructions/COUNCIL_CRITIC.md</code> plus the advocate's envelope. Produces a <code>CriticEnvelope</code>. Must reference at least 2 specific numbers from the advocate's argument and offer counter-numbers.</div>
+
+<div class="step"><div class="step-id">STEP 02.5.4</div><div class="step-title">Judge turn</div>
+Worker loads <code>icm/instructions/COUNCIL_JUDGE.md</code> plus both envelopes. Produces the <code>CouncilRulingEnvelope</code> from section 3.</div>
+
+<div class="step"><div class="step-id">STEP 02.5.5</div><div class="step-title">Meta-judge check</div>
+A second judge (different model again) validates that rules 1–4 in section 4 were honored. If not, the ruling is voided and STEP 02.5.4 re-runs with the meta-judge's feedback appended as correction. Max 2 attempts before human escalation.</div>
+
+<div class="step"><div class="step-id">STEP 02.5.6</div><div class="step-title">Emit downstream</div>
+On <em>proceed</em>: emit <code>revenue.brief_locked</code> with the final_brief payload. On <em>revise</em>: emit <code>council.revision_requested</code>. On <em>reject</em>: emit <code>council.rejected_with_alternative</code>.</div>
+
+<h2>6. Character binding for the Yappyverse world</h2>
+<p>Each Council role is a Yappyverse character. When a debate runs, the 3D world scene (subsystem 07) animates the character speaking their turn. The mapping:</p>
+<table>
+<tr><th>Council role</th><th>Character</th><th>Character config path</th><th>Voice</th></tr>
+<tr><td>Advocate</td><td>The Advocate (custom character)</td><td><code>assets/advocate/CHARACTER_CONFIG.json</code></td><td>ElevenLabs pauli_advocate_voice</td></tr>
+<tr><td>Critic</td><td>The Critic (custom character)</td><td><code>assets/critic/CHARACTER_CONFIG.json</code></td><td>ElevenLabs pauli_critic_voice</td></tr>
+<tr><td>Judge</td><td>Pauli</td><td><code>assets/pauli/CHARACTER_CONFIG.json</code></td><td>ElevenLabs pauli_elevenlabs (already live)</td></tr>
+</table>
+
+<h2>7. Acceptance criteria (judge for this subsystem)</h2>
+<ol>
+<li>All three roles are implemented and each has its own <code>icm/instructions/</code> markdown file.</li>
+<li>Envelope schema in section 3 is validated with Pydantic (or Zod on the frontend side) at every boundary.</li>
+<li>The meta-judge in STEP 02.5.5 is a real second call, on a third model, not a self-check.</li>
+<li>The four hard rules in section 4 each have a unit test that would fail if the rule were bypassed.</li>
+<li>Emitting downstream events matches the exact type strings in STEP 02.5.6.</li>
+</ol>
+
+</body></html>

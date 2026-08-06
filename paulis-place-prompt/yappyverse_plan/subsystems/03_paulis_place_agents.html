@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>03 — PAULIS-PLACE AGENTS</title>
+<style>body{font-family:ui-monospace,Menlo,monospace;max-width:1100px;margin:2rem auto;padding:0 1.5rem;background:#0A0714;color:#E6DCFF;line-height:1.65;font-size:15px}h1,h2,h3{color:#FF6432;font-family:Georgia,serif;font-style:italic;font-weight:500}h1{border-bottom:2px solid #C8AA32;padding-bottom:.5rem}h2{border-bottom:1px solid #2A1F3D;padding-bottom:.3rem;margin-top:2rem}code{background:#1E1035;color:#C8AA32;padding:2px 6px;border-radius:3px;font-size:.9em}pre{background:#140F1E;border:1px solid #2A1F3D;padding:1rem;border-radius:6px;overflow-x:auto;font-size:.85em}table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.9em}th,td{border:1px solid #2A1F3D;padding:8px 12px;text-align:left;vertical-align:top}th{background:#1A1230;color:#C8AA32}tr:nth-child(even) td{background:#140F1E}</style></head><body>
+
+<h1>03 — PAULIS-PLACE AGENTS AND ENVELOPES</h1>
+<p><strong>Repo:</strong> <code>PAULIS-PLACE</code>. Files: <code>adws/</code>, <code>adws/adw_modules/paulis_types.py</code> (envelope schemas already drafted), <code>adws/adw_sssf_config/sssf.config.yaml</code>.</p>
+
+<h2>1. Purpose</h2>
+<p>Five agent roles, each with a single well-scoped job, each with a locked envelope schema, each mapped to a character in the 3D world. SSSF discipline: agent proposes, code disposes.</p>
+
+<h2>2. The five roles</h2>
+<table>
+<tr><th>Role</th><th>Task profile</th><th>Owns</th><th>Cannot do</th><th>Character</th></tr>
+<tr><td><strong>Scanner</strong></td><td><code>score</code></td><td>Reads external signals (trends, autocomplete, Reddit). Emits <code>ScanOutput</code>.</td><td>Write to disk. Score. Decide.</td><td>Bambu</td></tr>
+<tr><td><strong>Scorer</strong></td><td><code>score</code></td><td>Ranks scan output into <code>ScoreOutput</code>.</td><td>Fetch new data. Publish anywhere.</td><td>The Scorer</td></tr>
+<tr><td><strong>Designer</strong></td><td><code>write_short</code></td><td>Produces platform-ready artifacts (listings, images-via-Replicate prompts, ebook chapters). Emits <code>DesignOutput</code>.</td><td>Publish. Judge its own work.</td><td>The Designer</td></tr>
+<tr><td><strong>Publisher</strong></td><td><code>write_short</code></td><td>Validates a Design against platform rules (Etsy title ≤ 140 chars, tag count = 13, allowed characters). Emits <code>PublishOutput</code>.</td><td>Write designs. Decide which platform.</td><td>The Publisher</td></tr>
+<tr><td><strong>Council (Advocate/Critic/Judge)</strong></td><td><code>write_long</code> + <code>judge</code></td><td>Runs the debate (subsystem 02). Emits <code>CouncilRulingEnvelope</code>.</td><td>Anything not listed in subsystem 02.</td><td>The Advocate, The Critic, Pauli</td></tr>
+</table>
+
+<h2>3. The envelope contract (icm/context/ENVELOPES.md)</h2>
+<pre>
+ScanOutput:
+  scan_id:      string
+  niche:        string
+  signals:      [ { keyword, source, strength_0_100, evidence_url } ]
+  cost_usd:     float
+
+ScoreOutput:
+  scan_id:      string
+  scored:       [ { keyword, opportunity_score_0_100, confidence_0_1, reasoning } ]
+  top_pick:     string
+  cost_usd:     float
+
+DesignOutput:
+  brief_id:     string
+  platform:     string
+  artifact_kind: enum ("listing" | "post_draft" | "chapter" | "landing_copy")
+  fields:       object            # platform-shaped, validated by Publisher
+  design_prompt: string or null   # Replicate/DALL-E prompt if image needed
+  cost_usd:     float
+
+PublishOutput:
+  brief_id:     string
+  validated:    boolean
+  violations:   [ string ]
+  ready_at:     ISO 8601
+  cost_usd:     float
+</pre>
+
+<h2>4. The SSSF gate contract</h2>
+<p>Every agent call ends with a code-side gate. Gates are cheap deterministic Python functions in <code>adws/adw_modules/gates.py</code>. They validate the envelope shape (Pydantic), enforce constraints (title length, tag count, cost cap), and either accept or emit a correction. Corrections re-prompt the same session, never restart.</p>
+
+<h2>5. Character binding for the 3D world</h2>
+<p>Each agent role emits a <code>lounge.character_active</code> event when running, so subsystem 07 can animate the mapped character.</p>
+
+<h2>6. Acceptance criteria</h2>
+<ol>
+<li>All 5 roles have entries in <code>sssf.config.yaml</code>.</li>
+<li>Envelope schemas exist in Pydantic form and match section 3.</li>
+<li>Gates enforce every constraint declared in the schemas.</li>
+<li>Each role emits <code>lounge.character_active</code> at start and <code>lounge.character_idle</code> at end.</li>
+</ol>
+
+</body></html>

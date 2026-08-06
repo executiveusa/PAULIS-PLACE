@@ -1,0 +1,38 @@
+{
+  "schema_version": 2,
+  "generated_at": "2026-08-06T23:22:42.6661537Z",
+  "printing_press_version": "4.30.1",
+  "api_name": "printify2",
+  "display_name": "Printify Public",
+  "cli_name": "printify2-pp-cli",
+  "creator": {
+    "handle": "executiveusa",
+    "name": "openhands"
+  },
+  "owner": "executiveusa",
+  "printer": "executiveusa",
+  "printer_name": "openhands",
+  "spec_url": "https://developers.printify.com/openapi.json",
+  "run_id": "20260806-232242",
+  "description": "Printify API enables you to automate product and order creation for a variety of scenarios",
+  "mcp_binary": "printify2-pp-mcp",
+  "mcp_tool_count": 40,
+  "mcp_ready": "full",
+  "api_version": "1.0.0",
+  "auth_type": "bearer_token",
+  "auth_preference": "bearerAuth",
+  "auth_env_vars": [
+    "PRINTING_PRESS_CLIENT_PROFILE"
+  ],
+  "auth_env_var_specs": [
+    {
+      "name": "PRINTING_PRESS_CLIENT_PROFILE",
+      "kind": "per_call",
+      "required": true,
+      "sensitive": false
+    }
+  ],
+  "endpoint_template_vars": [
+    "shop_id"
+  ]
+}

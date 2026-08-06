@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>YAPPYVERSE MASTER BUILD SPEC — Index</title>
+<meta name="spec-version" content="1.0.0">
+<meta name="spec-target-model" content="glm-4.6 / glm-5.2 (text-only, no vision)">
+<meta name="spec-runtime" content="production">
+<meta name="spec-owner" content="hermes-god-agent">
+<meta name="spec-license" content="internal-kupuri-media">
+<style>
+body{font-family:ui-monospace,Menlo,Consolas,monospace;max-width:1100px;margin:2rem auto;padding:0 1.5rem;background:#0A0714;color:#E6DCFF;line-height:1.65;font-size:15px}
+h1,h2,h3{color:#FF6432;font-family:Georgia,serif;font-style:italic;font-weight:500;letter-spacing:.01em}
+h1{border-bottom:2px solid #C8AA32;padding-bottom:.5rem}
+h2{border-bottom:1px solid #2A1F3D;padding-bottom:.3rem;margin-top:2.5rem}
+code{background:#1E1035;color:#C8AA32;padding:2px 6px;border-radius:3px;font-size:.9em}
+pre{background:#140F1E;border:1px solid #2A1F3D;padding:1rem;border-radius:6px;overflow-x:auto;font-size:.85em}
+table{width:100%;border-collapse:collapse;margin:1rem 0}
+th,td{border:1px solid #2A1F3D;padding:8px 12px;text-align:left;font-size:.9em}
+th{background:#1A1230;color:#C8AA32}
+tr:nth-child(even) td{background:#140F1E}
+.warn{background:#3A0A0A;border-left:4px solid #E05A5A;padding:12px 16px;margin:1rem 0;border-radius:0 6px 6px 0}
+.info{background:#0A1E3A;border-left:4px solid #5B9BD5;padding:12px 16px;margin:1rem 0;border-radius:0 6px 6px 0}
+.good{background:#0F3A2A;border-left:4px solid #4DC99A;padding:12px 16px;margin:1rem 0;border-radius:0 6px 6px 0}
+a{color:#C8AA32;text-decoration:none;border-bottom:1px dotted #C8AA32}
+a:hover{color:#FF6432;border-color:#FF6432}
+.route-card{background:#1A1230;border:1px solid #2A1F3D;border-radius:8px;padding:16px 20px;margin:12px 0}
+.route-id{font-size:.7em;color:#6B5F8A;font-family:ui-monospace,monospace;letter-spacing:.1em;text-transform:uppercase}
+.route-title{color:#E6DCFF;font-size:1.05em;font-weight:600;margin:4px 0 8px}
+.pill{display:inline-block;font-size:.7em;padding:2px 8px;border-radius:3px;margin-right:4px}
+.p-hermes{background:#3A2A0A;color:#D4A017}
+.p-worker{background:#0A1E3A;color:#5B9BD5}
+.p-glm{background:#0F3A2A;color:#4DC99A}
+.p-judge{background:#3A0A0A;color:#E05A5A}
+.p-human{background:#1E1035;color:#A080E0}
+</style>
+</head>
+<body>
+
+<h1>YAPPYVERSE MASTER BUILD SPEC</h1>
+<p><strong>Author:</strong> Systems Architect (Opus, spec-only mode)<br>
+<strong>Reader:</strong> GLM 5.2 / GLM 4.6 workers under Hermes orchestration<br>
+<strong>Runtime target:</strong> production (not dev harness)<br>
+<strong>Repos in scope:</strong> <code>YAPPYVERSE-FACTORY</code>, <code>PAULIS-PLACE</code>, <code>lovable-ai-dreamweaver</code>, <code>pauli-hermes-agent</code></p>
+
+<div class="warn">
+<strong>DO NOT WRITE CODE FROM THIS FILE ALONE.</strong> This is the routing index. Every worker must open the specific subsystem HTML spec listed in section 6 before touching that subsystem. Do not synthesize. Do not invent details. If a spec is silent, halt and ask the human, do not fill the gap.
+</div>
+
+<h2>1. What we are building, in one paragraph</h2>
+<p>The Yappyverse is a living world of AI avatars, backed by real humans, hosted at <strong>Paulie's Place</strong> — a Seattle-2056 jazz-lounge parody of a mob hangout where the avatars work, argue, and make real business decisions. Every avatar is the face of a real agent role inside <code>PAULIS-PLACE</code> (the revenue factory). Every agent decision is a scene in the world. Every scene is observable by the public in a 3D lounge on the <code>lovable-ai-dreamweaver</code> frontend, controlled by voice like Jarvis. Every revenue event auto-posts to social via Zernio. Everything the humans behind the avatars do gets a "Humans in the Loop" comedy cutaway at the end of the clip. The whole thing runs autonomously, orchestrated by <strong>Hermes</strong> — the god agent.</p>
+
+<h2>2. The three-part system</h2>
+<table>
+<tr><th>Part</th><th>Repo</th><th>Runtime</th><th>Purpose</th></tr>
+<tr><td><strong>Backend (agentic)</strong></td><td><code>YAPPYVERSE-FACTORY</code> + <code>PAULIS-PLACE</code> + <code>pauli-hermes-agent</code></td><td>VPS <code>31.220.58.212</code> (Hermes) + Railway (PAULIS-PLACE FastAPI) + Vercel functions (Factory)</td><td>Runs the factory floor, the revenue channels, the agent council, the Zernio posting, the payments</td></tr>
+<tr><td><strong>Public frontend</strong></td><td><code>lovable-ai-dreamweaver</code></td><td>Lovable / Vite / Vercel edge</td><td>Character pages, product feed, social embed, entry point to the 3D world</td></tr>
+<tr><td><strong>3D observable world</strong></td><td><code>lovable-ai-dreamweaver</code> (subroute <code>/lounge</code>)</td><td>Three.js WebGL, voice via Web Speech API, agent state via WebSocket from PAULIS-PLACE</td><td>Paulie's Place lounge, walk-around, voice-command Jarvis-style, avatars react and act in real time</td></tr>
+</table>
+
+<h2>3. Hermes — the god agent</h2>
+<p>Hermes is the runtime orchestrator. Not a dev-time IDE (Orca/Tracer are dev tools — Hermes takes their lessons but runs in production). Hermes lives at <code>pauli-hermes-agent</code> and its job is:</p>
+<ul>
+<li><strong>Plan</strong> — decompose incoming events into typed work items</li>
+<li><strong>Delegate</strong> — route each work item to the cheapest worker that can succeed at it (auto-model-switcher, section 8)</li>
+<li><strong>Judge</strong> — every worker output goes through an adversarial checker before it is accepted (Tracer's "Fable reviews cheap workers" lesson, applied to production)</li>
+<li><strong>Emit</strong> — every accepted output produces a downstream event (Zernio post, agent scene in the 3D world, ops report)</li>
+</ul>
+<p>Hermes does not write code. Hermes does not implement. Hermes reads, thinks, splits, delegates, and judges — the exact discipline the Tracer transcript names.</p>
+
+<h2>4. The routing table (the whole system in one grid)</h2>
+<p>Every event in the system enters through one of these routes. Every route has one owner, one worker profile, one judge, one output type.</p>
+
+<div class="route-card">
+<div class="route-id">R-01 · REVENUE.NEW_TREND</div>
+<div class="route-title">A hot trend was detected → decide if we make a product</div>
+<span class="pill p-hermes">HERMES plans</span><span class="pill p-worker">SCORER worker</span><span class="pill p-judge">COUNCIL judges</span><span class="pill p-human">HUMAN approves if &gt; $10 blast radius</span>
+<p>Owner: <code>PAULIS-PLACE / adws / adw_scan_trends.py</code>. Spec: <a href="subsystems/01_hermes_orchestrator.html">01_hermes_orchestrator.html</a> + <a href="subsystems/03_paulis_place_agents.html">03_paulis_place_agents.html</a></p>
+</div>
+
+<div class="route-card">
+<div class="route-id">R-02 · REVENUE.PRODUCT_CREATED</div>
+<div class="route-title">A new product was made → post it to social, show it in the lounge</div>
+<span class="pill p-hermes">HERMES fans out</span><span class="pill p-worker">ZERNIO_POSTER worker</span><span class="pill p-worker">LOUNGE_SCENE worker</span><span class="pill p-judge">STYLE_JUDGE checks post copy</span>
+<p>Owner: event bus → Zernio + WebSocket to the lounge. Spec: <a href="subsystems/05_zernio_social_posting.html">05_zernio_social_posting.html</a> + <a href="subsystems/07_3d_world_lounge.html">07_3d_world_lounge.html</a></p>
+</div>
+
+<div class="route-card">
+<div class="route-id">R-03 · COUNCIL.DEBATE_REQUEST</div>
+<div class="route-title">Agent proposes a decision → three-turn adversarial debate → locked ruling</div>
+<span class="pill p-hermes">HERMES orchestrates</span><span class="pill p-worker">ADVOCATE (llama-8b)</span><span class="pill p-worker">CRITIC (qwen-32b)</span><span class="pill p-judge">JUDGE (glm-4.6, higher reasoning)</span>
+<p>Owner: SSSF ADW <code>adw_council_debate.py</code>. Spec: <a href="subsystems/02_adversarial_council.html">02_adversarial_council.html</a></p>
+</div>
+
+<div class="route-card">
+<div class="route-id">R-04 · WORLD.HUMAN_VOICE_COMMAND</div>
+<div class="route-title">A visitor speaks to the lounge → Jarvis-style routing → avatar reacts</div>
+<span class="pill p-hermes">HERMES translates intent</span><span class="pill p-worker">Nearest AVATAR worker</span><span class="pill p-judge">SAFETY_JUDGE screens command</span>
+<p>Owner: <code>lovable-ai-dreamweaver / src/lounge/voice-router.ts</code>. Spec: <a href="subsystems/07_3d_world_lounge.html">07_3d_world_lounge.html</a> + <a href="subsystems/08_voice_control_jarvis.html">08_voice_control_jarvis.html</a></p>
+</div>
+
+<div class="route-card">
+<div class="route-id">R-05 · PAYMENT.SETTLED</div>
+<div class="route-title">Creem or BTCPay confirms → grant access → celebrate in lounge → ledger</div>
+<span class="pill p-hermes">HERMES receives webhook</span><span class="pill p-worker">RECONCILER worker</span><span class="pill p-worker">LEDGER worker</span><span class="pill p-worker">LOUNGE_CELEBRATION worker</span>
+<p>Owner: PAULIS-PLACE payment_service.py. Spec: <a href="subsystems/06_payments_and_ledger.html">06_payments_and_ledger.html</a></p>
+</div>
+
+<div class="route-card">
+<div class="route-id">R-06 · REVENUE.CHANNEL_TICK (cron)</div>
+<div class="route-title">Scheduled tick → run one of the six revenue channels</div>
+<span class="pill p-hermes">HERMES from cron</span><span class="pill p-worker">Channel-specific worker (CH1..CH6)</span><span class="pill p-judge">OUTPUT_JUDGE per channel</span>
+<p>Owner: Celery beat + Hermes bridge. Spec: <a href="subsystems/04_six_revenue_channels.html">04_six_revenue_channels.html</a></p>
+</div>
+
+<div class="route-card">
+<div class="route-id">R-07 · SYSTEM.SELF_IMPROVE (nightly)</div>
+<div class="route-title">Aggregate day's ops reports → propose improvements → judge → open PRs</div>
+<span class="pill p-hermes">HERMES reads memory</span><span class="pill p-worker">IMPROVEMENT worker</span><span class="pill p-judge">Human approves each PR</span>
+<p>Owner: nightly cron on VPS. Spec: <a href="subsystems/09_self_improvement_loop.html">09_self_improvement_loop.html</a></p>
+</div>
+
+<h2>5. The four hard laws that override every subsystem</h2>
+<table>
+<tr><th>Law</th><th>Rule</th><th>Enforced how</th></tr>
+<tr><td><strong>L1 — No code writes prod without a judge</strong></td><td>Every worker output goes through an adversarial judge before it is accepted. No exceptions.</td><td>Judge is a separate model, separate call, structured refusal contract</td></tr>
+<tr><td><strong>L2 — Blast radius ≤ 3</strong></td><td>No single action touches more than 3 services. Cross-repo actions require an explicit multi-service plan.</td><td>Hermes checks the action manifest before dispatch. Halt if &gt; 3.</td></tr>
+<tr><td><strong>L3 — Cost guard per task and per day</strong></td><td>$0.50 per channel run. $5/day total AI spend. Every worker declares its expected cost before dispatch.</td><td>AI Gateway meter + Hermes pre-flight check</td></tr>
+<tr><td><strong>L4 — No secrets in code, ever</strong></td><td>All secrets in the vault (Infisical target, .env fallback for MVP). Zernio key, Creem, BTCPay, model keys — none in git.</td><td>Pre-commit grep for <code>sk_</code>, <code>_KEY=</code>, <code>ghp_</code> patterns. Circuit breaker halt on match.</td></tr>
+</table>
+
+<h2>6. Subsystem specs — read the one you're assigned, only that one</h2>
+<ol>
+<li><a href="subsystems/01_hermes_orchestrator.html">01_hermes_orchestrator.html</a> — the god agent, plan/delegate/judge loop, event bus, model routing</li>
+<li><a href="subsystems/02_adversarial_council.html">02_adversarial_council.html</a> — three-turn debate, advocate/critic/judge, locked-ruling contract</li>
+<li><a href="subsystems/03_paulis_place_agents.html">03_paulis_place_agents.html</a> — the 5 SSSF agent roles, envelope types, gates</li>
+<li><a href="subsystems/04_six_revenue_channels.html">04_six_revenue_channels.html</a> — CH1 affiliate, CH2 domains, CH3 services, CH4 micro-apps, CH5 ebooks, CH6 thrift</li>
+<li><a href="subsystems/05_zernio_social_posting.html">05_zernio_social_posting.html</a> — Zernio integration, auto-post per event, 15+ platforms</li>
+<li><a href="subsystems/06_payments_and_ledger.html">06_payments_and_ledger.html</a> — Creem, BTCPay, webhook reconciliation, access grants</li>
+<li><a href="subsystems/07_3d_world_lounge.html">07_3d_world_lounge.html</a> — Paulie's Place Three.js scene, avatar workers, real-time state</li>
+<li><a href="subsystems/08_voice_control_jarvis.html">08_voice_control_jarvis.html</a> — Web Speech API, intent routing, avatar reactions</li>
+<li><a href="subsystems/09_self_improvement_loop.html">09_self_improvement_loop.html</a> — nightly analysis, Meadows scoring, PR generation</li>
+<li><a href="subsystems/10_icm_folder_layout.html">10_icm_folder_layout.html</a> — Instructions/Context/Memory folder discipline, model-agnostic portability</li>
+</ol>
+
+<h2>7. The ICM folder method — the repository shape</h2>
+<p>Every repo uses the same three-folder root, called <code>icm/</code>. This is what makes the whole system model-agnostic and portable — Hermes, GLM, Claude, Kimi, and any future model all read the same files from the same locations.</p>
+<pre>
+&lt;repo-root&gt;/
+├── icm/
+│   ├── instructions/       # WHAT to do — system prompts, role definitions, laws
+│   │   ├── HERMES.md
+│   │   ├── COUNCIL.md
+│   │   ├── SCANNER.md
+│   │   ├── SCORER.md
+│   │   ├── DESIGNER.md
+│   │   ├── PUBLISHER.md
+│   │   └── AVATAR_&lt;name&gt;.md
+│   ├── context/            # WHERE — repo maps, API contracts, envelope types, current state
+│   │   ├── REPO_MAP.md
+│   │   ├── EVENT_BUS.md
+│   │   ├── ENVELOPES.md
+│   │   ├── CHARACTER_REGISTRY.md
+│   │   └── OPEN_BRAIN_SCHEMA.md
+│   └── memory/             # HISTORY — ops reports, decisions, learned patterns
+│       ├── ops/            # dated per-run reports
+│       ├── decisions/      # Council rulings, one file per ruling
+│       └── patterns/       # promoted lessons the system has learned
+└── ... (rest of the repo)
+</pre>
+<div class="info">Rationale: the model-agnostic switcher (section 8) can hand any of these files to any model, cheap or expensive, because instructions never assume vision, code capabilities, or model-specific tool syntax. Every file is markdown, every reference is a path, every contract is a JSON schema in <code>context/</code>.</div>
+
+<h2>8. The auto-model-switcher (routing at gateway level)</h2>
+<p>Hermes never picks a model directly. It declares a <strong>task profile</strong>. The Vercel AI Gateway picks the model. This means you swap models at the gateway, not in code.</p>
+<table>
+<tr><th>Task profile</th><th>Preferred model (2026)</th><th>Fallback</th><th>Reason</th></tr>
+<tr><td><code>plan</code></td><td>Claude Fable 5 (or Opus 4.8)</td><td>Kimi K3</td><td>High reasoning, low speed OK</td></tr>
+<tr><td><code>judge</code></td><td>Claude Fable 5</td><td>GLM 4.6 with high thinking</td><td>Cannot be the same model that produced the output being judged</td></tr>
+<tr><td><code>implement</code></td><td>Codex (GPT-5) via subscription</td><td>GLM 5.2</td><td>Code writing, subscription-covered</td></tr>
+<tr><td><code>write_short</code></td><td>Grok 4.5 (fast)</td><td>GLM 5.2 fast variant</td><td>Interactive, near-real-time</td></tr>
+<tr><td><code>write_long</code></td><td>Kimi K3</td><td>GLM 4.6</td><td>Async, cost-optimized</td></tr>
+<tr><td><code>score</code></td><td>Qwen (Qwen 3.5)</td><td>Llama-3.1-70b via OpenRouter</td><td>Numerical reasoning, cheap</td></tr>
+<tr><td><code>test</code></td><td>Kimi K3</td><td>GLM 5.2</td><td>Long repetitive work</td></tr>
+<tr><td><code>docs</code></td><td>Qwen (small)</td><td>Llama-3.1-8b</td><td>Trivial, cheapest</td></tr>
+</table>
+<p>The switcher lives at <code>pauli-hermes-agent / src / router / profile_router.ts</code>. Spec is inside <a href="subsystems/01_hermes_orchestrator.html">01_hermes_orchestrator.html</a> section 4.</p>
+
+<h2>9. What GLM 5.2 workers must know before reading anything else</h2>
+<div class="warn">
+<strong>GLM 5.2 has no vision.</strong> Every handoff to GLM is text-only. Rules that must be honored by any spec author writing for GLM:
+<ul>
+<li>Never write "see the screenshot" or "as shown in the image."</li>
+<li>Every UI layout is described in words: element name, position (parent + row/column index + top-to-bottom), size intent, semantic role.</li>
+<li>Every reference is a path or a URL, never a picture.</li>
+<li>Every code block is complete — no "..." elisions. GLM will not guess.</li>
+<li>Every ambiguous term is defined inline the first time it appears in the spec.</li>
+<li>Every step has a numbered position in its subsystem. The judge validates work by step number.</li>
+</ul>
+</div>
+
+<h2>10. The reader's contract</h2>
+<p>If you are a worker reading this file:</p>
+<ol>
+<li>You have one subsystem assignment. Read only that one from section 6.</li>
+<li>Every claim you produce must map to a numbered step in that subsystem's spec.</li>
+<li>Every artifact you write goes into <code>icm/memory/ops/&lt;date&gt;/&lt;your-adw-id&gt;.json</code>.</li>
+<li>You never touch code paths outside the ones your subsystem lists in its <em>Writes</em> section.</li>
+<li>When you finish, you emit a machine-readable envelope (schema in <code>icm/context/ENVELOPES.md</code>).</li>
+<li>You do not commit. You do not merge. You do not deploy. The judge decides.</li>
+</ol>
+
+<div class="good">
+<strong>End of index.</strong> Do not build from this file. Open your assigned subsystem in section 6 and read it end-to-end before you propose any implementation. If the subsystem file is missing or unreadable, halt and ask the human — never guess.
+</div>
+
+</body>
+</html>

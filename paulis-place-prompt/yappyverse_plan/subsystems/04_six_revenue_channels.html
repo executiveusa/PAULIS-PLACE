@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>04 — SIX REVENUE CHANNELS</title>
+<style>body{font-family:ui-monospace,Menlo,monospace;max-width:1100px;margin:2rem auto;padding:0 1.5rem;background:#0A0714;color:#E6DCFF;line-height:1.65;font-size:15px}h1,h2,h3{color:#FF6432;font-family:Georgia,serif;font-style:italic;font-weight:500}h1{border-bottom:2px solid #C8AA32;padding-bottom:.5rem}h2{border-bottom:1px solid #2A1F3D;padding-bottom:.3rem;margin-top:2rem}code{background:#1E1035;color:#C8AA32;padding:2px 6px;border-radius:3px;font-size:.9em}pre{background:#140F1E;border:1px solid #2A1F3D;padding:1rem;border-radius:6px;overflow-x:auto;font-size:.85em}table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.9em}th,td{border:1px solid #2A1F3D;padding:8px 12px;text-align:left;vertical-align:top}th{background:#1A1230;color:#C8AA32}tr:nth-child(even) td{background:#140F1E}.warn{background:#3A0A0A;border-left:4px solid #E05A5A;padding:12px 16px;margin:1rem 0;border-radius:0 6px 6px 0}.info{background:#0A1E3A;border-left:4px solid #5B9BD5;padding:12px 16px;margin:1rem 0;border-radius:0 6px 6px 0}.ch{background:#1A1230;border:1px solid #2A1F3D;border-radius:8px;padding:14px 18px;margin:1rem 0}.ch-name{color:#C8AA32;font-weight:600;letter-spacing:.03em}</style></head><body>
+
+<h1>04 — SIX REVENUE CHANNELS</h1>
+<p><strong>Repo:</strong> <code>PAULIS-PLACE</code> — ADW scripts in <code>adws/</code>, Celery tasks in <code>backend/workers/revenue_tasks.py</code><br>
+<strong>Reader model:</strong> GLM 5.2 (text-only)</p>
+
+<h2>1. Purpose</h2>
+<p>Six autonomous revenue channels run on cron. Each channel has one ADW script (SSSF pattern), one Celery task that dispatches to it, and one set of downstream events that flow to Zernio (posts) and the 3D world (avatar scenes). Every channel obeys the same cost cap: $0.50 per run.</p>
+
+<h2>2. Global schedule</h2>
+<table>
+<tr><th>Channel</th><th>Schedule</th><th>Owner ADW</th><th>Character on screen</th></tr>
+<tr><td>CH1 Affiliate content</td><td>7:00 UTC, 19:00 UTC daily</td><td><code>adws/adw_ch1_affiliate.py</code></td><td>The Publisher</td></tr>
+<tr><td>CH2 Domain flip</td><td>Tuesday 09:00 UTC weekly</td><td><code>adws/adw_ch2_domain_flip.py</code></td><td>Bambu</td></tr>
+<tr><td>CH3 Faceless-YT services</td><td>Mon/Wed/Fri 08:00 UTC</td><td><code>adws/adw_ch3_channel_services.py</code></td><td>The Designer</td></tr>
+<tr><td>CH4 Micro-apps (Creem)</td><td>Sun 10:00 UTC ideation + daily 11:00 UTC Creem product creation</td><td><code>adws/adw_ch4_microapp.py</code></td><td>Council (all three)</td></tr>
+<tr><td>CH5 Ebook pipeline</td><td>Thu 09:00 UTC research + daily 14:00 UTC chapter gen</td><td><code>adws/adw_ch5_ebooks.py</code></td><td>The Scorer</td></tr>
+<tr><td>CH6 Thrift flip listings</td><td>Tue/Sat 08:30 UTC</td><td><code>adws/adw_ch6_thrift.py</code></td><td>Bambu</td></tr>
+</table>
+
+<h2>3. The shared channel structure</h2>
+<p>Every channel ADW has the same four phases, in this order:</p>
+<ol>
+<li><strong>Research</strong> (<code>scanner</code> profile) — gather signals. Read-only.</li>
+<li><strong>Rank</strong> (<code>scorer</code> profile) — pick the best opportunity.</li>
+<li><strong>Produce</strong> (<code>designer</code> or channel-specific worker) — turn the pick into an artifact.</li>
+<li><strong>Validate</strong> (<code>publisher</code> profile) — check the artifact against platform rules. On pass, emit <code>revenue.channel_output_ready</code>.</li>
+</ol>
+
+<h2>4. Channel-by-channel briefs</h2>
+
+<div class="ch"><div class="ch-name">CH1 · AFFILIATE CONTENT ENGINE</div>
+<p><strong>Goal:</strong> generate short-form content that promotes AI-tool affiliate links with recurring commissions. Publisher character posts them.</p>
+<p><strong>Input signals:</strong> ProductHunt launches this week, AppSumo deals, Reddit r/SaaS threads.</p>
+<p><strong>Output artifacts:</strong> per pick, three drafts (one for TikTok, one for Instagram Reels, one for X thread). Each includes the affiliate link with UTM tags <code>?utm_source=paulisplace&utm_campaign=&lt;tool-slug&gt;</code>.</p>
+<p><strong>Zernio dispatch:</strong> emits three <code>revenue.channel_output_ready</code> events, one per platform draft.</p>
+<p><strong>Cost cap:</strong> $0.30/run.</p>
+</div>
+
+<div class="ch"><div class="ch-name">CH2 · DOMAIN FLIP INTELLIGENCE</div>
+<p><strong>Goal:</strong> identify brandable domains at auction with high resale potential.</p>
+<p><strong>Input signals:</strong> GoDaddy auctions expiring in the next 7 days, DropCatch feed.</p>
+<p><strong>Output artifacts:</strong> a shortlist of 5 domains with rationale, valuation estimate, and target buyer profile. Written to <code>icm/memory/decisions/domains_&lt;date&gt;.md</code>. No auto-purchase — human confirms in the lounge via a <code>trigger_purchase</code> voice command.</p>
+<p><strong>Zernio dispatch:</strong> optional weekly summary post on X for audience-building.</p>
+<p><strong>Cost cap:</strong> $0.40/run.</p>
+</div>
+
+<div class="ch"><div class="ch-name">CH3 · FACELESS-YT SERVICES</div>
+<p><strong>Goal:</strong> offer competitor-breakdown reports for faceless-YouTube channel owners as a service (Gumroad/Stan Store product).</p>
+<p><strong>Input signals:</strong> trending channels in target niches (finance, self-improvement, history retold).</p>
+<p><strong>Output artifacts:</strong> one sample report per week (published free as lead magnet), 20+ paid report SKUs generated per week (each ~$47).</p>
+<p><strong>Zernio dispatch:</strong> LinkedIn and X posts announcing new reports; Reddit posts in niche-relevant subs (rate-limited to protect subreddit standing).</p>
+<p><strong>Cost cap:</strong> $0.50/run.</p>
+</div>
+
+<div class="ch"><div class="ch-name">CH4 · MICRO-APPS (Creem-paywalled)</div>
+<p><strong>Goal:</strong> ship one small tool per week — a niche calculator, a specific-purpose generator, a boring-problem solver — priced $9–$47 with Creem paywall.</p>
+<p><strong>Input signals:</strong> Reddit "how do I…" posts with high engagement in target niches, Twitter complaints.</p>
+<p><strong>Output artifacts:</strong> spec brief for the tool. Human implements it. Once shipped, Creem product SKU is created via API and paywall is wired.</p>
+<p><strong>Council involvement:</strong> the "should we build this?" decision goes through subsystem 02 Council. Advocate makes the case (niche size, willingness to pay), Critic tears down (existing tools, technical debt), Judge rules.</p>
+<p><strong>Zernio dispatch:</strong> launch post on X, ProductHunt entry drafted (posted manually), LinkedIn post.</p>
+<p><strong>Cost cap:</strong> $0.50 for ideation, separate budget for the Creem creation (no AI cost, just API).</p>
+</div>
+
+<div class="ch"><div class="ch-name">CH5 · EBOOK PIPELINE (KDP)</div>
+<p><strong>Goal:</strong> ship niche non-fiction ebooks to Kindle Direct Publishing, ride keyword traffic, collect royalties.</p>
+<p><strong>Input signals:</strong> KDPRocket-style keyword gaps, Google Trends for evergreen how-to searches.</p>
+<p><strong>Output artifacts:</strong> per week, one ebook outline (Thursday research). Daily, one chapter (Monday–Sunday). Book cover generated via Replicate.</p>
+<p><strong>Zernio dispatch:</strong> book launch post, Reddit-friendly announcements in relevant subs, TikTok short "here's a book I wrote" (optional, human-approved).</p>
+<p><strong>Cost cap:</strong> $0.50 for research, $0.20/day for chapter generation.</p>
+</div>
+
+<div class="ch"><div class="ch-name">CH6 · THRIFT FLIP LISTINGS</div>
+<p><strong>Goal:</strong> generate research briefs for eBay/Poshmark reselling — the human sources the items, the AI writes the listings.</p>
+<p><strong>Input signals:</strong> Terapeak sold-listings feed, TrendGirl feed, eBay category velocity.</p>
+<p><strong>Output artifacts:</strong> a weekly "hunt list" of 20 items likely to sell fast, with condition benchmarks, keyword-optimized titles, and a description template per SKU.</p>
+<p><strong>Zernio dispatch:</strong> optional TikTok "here's what I found" posts (human-approved before publish).</p>
+<p><strong>Cost cap:</strong> $0.40/run.</p>
+</div>
+
+<h2>5. The shared cost-and-safety guardrails</h2>
+<div class="warn">
+<ol>
+<li>Each channel run declares its predicted cost before dispatch. Gateway rejects if predicted &gt; cap.</li>
+<li>All 6 channels together must not exceed $5/day. The Redis counter is shared. If exceeded, remaining channel runs for the day are queued to tomorrow.</li>
+<li>No channel may publish to Etsy, Printify, Creem, or KDP without human approval on the specific artifact. The channels produce briefs and drafts — the human hits "publish" through a lounge voice command or the frontend.</li>
+<li>Every channel writes an ops report to <code>icm/memory/ops/&lt;date&gt;/ch&lt;N&gt;_&lt;correlation-id&gt;.json</code>.</li>
+</ol>
+</div>
+
+<h2>6. Acceptance criteria</h2>
+<ol>
+<li>All 6 channel ADW files exist and each has the 4 phases in section 3.</li>
+<li>The schedule in section 2 is expressed in <code>celery_app.py</code>'s beat schedule.</li>
+<li>Each channel emits <code>revenue.channel_output_ready</code> with a valid envelope on success.</li>
+<li>Cost caps are enforced with pre-flight checks; violations halt the run.</li>
+<li>The 3D world (subsystem 07) receives events per the "Character on screen" column and animates the matching avatar.</li>
+</ol>
+
+</body></html>

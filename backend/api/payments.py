@@ -5,6 +5,10 @@ from pydantic import BaseModel
 from typing import Optional
 from models.base import get_db
 from services.payment_service import payment_service, Payment, PaymentStatus
+<<<<<<< HEAD
+from services.ledger_service import reconcile_event
+=======
+>>>>>>> origin/main
 
 router = APIRouter(prefix="/api/payments", tags=["payments"])
 
@@ -62,17 +66,69 @@ async def create_btcpay_invoice(payment_id: str):
 
 @router.post("/webhooks/creem")
 async def creem_webhook(req: Request):
+<<<<<<< HEAD
+    """Handle Creem webhook — pass 1) payment_service for DB write, 2) ledger_service for R-05 orchestration."""
+    payload = await req.json()
+    result = await payment_service.handle_creem_webhook(payload)
+
+    # If status=paid, also run the spec-compliant R-05 pipeline
+    status = payload.get("status", "").lower()
+    if status in ("paid", "succeeded", "completed"):
+        payment_id = payload.get("metadata", {}).get("payment_id") or payload.get("order_id")
+        amount = payload.get("amount_total", payload.get("amount", 0)) or 0
+        # Convert cents → dollars if needed
+        if amount > 1000:
+            amount = amount / 100.0
+        product_id = payload.get("metadata", {}).get("product_id")
+        customer_ref = payload.get("customer_email") or payload.get("customer")
+        try:
+            await reconcile_event(
+                payment_id=payment_id or "pay_creem_unknown",
+                provider="creem",
+                amount_usd=float(amount),
+                customer_ref=customer_ref,
+                product_id=product_id,
+                granted_access=["asset_download"],
+            )
+        except Exception as e:
+            result["ledger_orchestration_error"] = str(e)[:300]
+
+=======
     """Handle Creem webhook"""
     payload = await req.json()
     result = await payment_service.handle_creem_webhook(payload)
+>>>>>>> origin/main
     return result
 
 
 @router.post("/webhooks/btcpay")
 async def btcpay_webhook(req: Request):
+<<<<<<< HEAD
+    """Handle BTCPay Server webhook — same pattern."""
+    payload = await req.json()
+    result = await payment_service.handle_btcpay_webhook(payload)
+
+    status = (payload.get("type", "") or payload.get("status", "")).lower()
+    if "paid" in status or "confirmed" in status:
+        payment_id = payload.get("orderId") or payload.get("metadata", {}).get("payment_id")
+        amount = float(payload.get("amount", 0) or 0)
+        product_id = payload.get("metadata", {}).get("product_id")
+        try:
+            await reconcile_event(
+                payment_id=payment_id or "pay_btcpay_unknown",
+                provider="btcpay",
+                amount_usd=amount,
+                product_id=product_id,
+                granted_access=["asset_download"],
+            )
+        except Exception as e:
+            result["ledger_orchestration_error"] = str(e)[:300]
+
+=======
     """Handle BTCPay Server webhook"""
     payload = await req.json()
     result = await payment_service.handle_btcpay_webhook(payload)
+>>>>>>> origin/main
     return result
 
 

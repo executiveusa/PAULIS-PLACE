@@ -42,3 +42,22 @@ logs/
 docker-compose.override.yml
 .vercel
 .env*
+<<<<<<< HEAD
+
+# Printed CLIs (built artifacts)
+printed-clis/**/*.exe
+printed-clis/**/*.exe~
+printed-clis/**/*.bin
+printed-clis/**/*.dll
+printed-clis/**/*.dylib
+printed-clis/**/*.test
+printed-clis/**/*.out
+printed-clis/**/build/
+printed-clis/**/dist/
+printed-clis/**/vendor/
+printed-clis/**/*.log
+
+# Go cache
+*.gocache/
+=======
+>>>>>>> origin/main

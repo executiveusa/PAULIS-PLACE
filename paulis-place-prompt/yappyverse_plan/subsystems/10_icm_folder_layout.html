@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>10 — ICM FOLDER LAYOUT</title>
+<style>body{font-family:ui-monospace,Menlo,monospace;max-width:1100px;margin:2rem auto;padding:0 1.5rem;background:#0A0714;color:#E6DCFF;line-height:1.65;font-size:15px}h1,h2,h3{color:#FF6432;font-family:Georgia,serif;font-style:italic;font-weight:500}h1{border-bottom:2px solid #C8AA32;padding-bottom:.5rem}h2{border-bottom:1px solid #2A1F3D;padding-bottom:.3rem;margin-top:2rem}code{background:#1E1035;color:#C8AA32;padding:2px 6px;border-radius:3px;font-size:.9em}pre{background:#140F1E;border:1px solid #2A1F3D;padding:1rem;border-radius:6px;overflow-x:auto;font-size:.85em}table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.9em}th,td{border:1px solid #2A1F3D;padding:8px 12px;text-align:left;vertical-align:top}th{background:#1A1230;color:#C8AA32}tr:nth-child(even) td{background:#140F1E}.warn{background:#3A0A0A;border-left:4px solid #E05A5A;padding:12px 16px;margin:1rem 0;border-radius:0 6px 6px 0}.info{background:#0A1E3A;border-left:4px solid #5B9BD5;padding:12px 16px;margin:1rem 0;border-radius:0 6px 6px 0}</style></head><body>
+
+<h1>10 — ICM FOLDER LAYOUT</h1>
+<p><strong>Applies to:</strong> every repo in scope (<code>PAULIS-PLACE</code>, <code>YAPPYVERSE-FACTORY</code>, <code>lovable-ai-dreamweaver</code>, <code>pauli-hermes-agent</code>)<br>
+<strong>Reader model:</strong> GLM 5.2 (text-only)</p>
+
+<h2>1. Purpose</h2>
+<p>Every repo uses the same three top-level folders — <code>icm/instructions</code>, <code>icm/context</code>, <code>icm/memory</code> — so any model, any agent, any human on the team can find the same kind of file at the same relative path in any of the four repos. This is what makes the system portable across models: instructions and context are markdown, memory is JSON, no vision required, no model-specific tool syntax.</p>
+
+<h2>2. The three folders — one job each</h2>
+<table>
+<tr><th>Folder</th><th>Contains</th><th>Written by</th><th>Read by</th></tr>
+<tr><td><code>icm/instructions/</code></td><td>WHAT to do — role prompts, system laws, escalation rules</td><td>Humans (spec authors). Never written by an agent at runtime.</td><td>Every agent, every run</td></tr>
+<tr><td><code>icm/context/</code></td><td>WHERE things live — repo maps, envelope schemas, event bus contract, character registry</td><td>Humans, plus the self-improvement loop (subsystem 09) when patterns are promoted</td><td>Every agent that needs to touch a boundary — API, DB, event, envelope</td></tr>
+<tr><td><code>icm/memory/</code></td><td>HISTORY — what happened. Ops reports, decisions, patterns</td><td>Hermes (ops reports), Council (decisions), self-improvement (patterns)</td><td>The self-improvement loop, humans reviewing runs, agents needing prior context</td></tr>
+</table>
+
+<h2>3. The full layout, every file named</h2>
+<pre>
+&lt;repo-root&gt;/
+├── icm/
+│   ├── instructions/
+│   │   ├── HERMES.md
+│   │   ├── ESCALATION.md
+│   │   ├── COUNCIL_ADVOCATE.md
+│   │   ├── COUNCIL_CRITIC.md
+│   │   ├── COUNCIL_JUDGE.md
+│   │   ├── SCANNER.md
+│   │   ├── SCORER.md
+│   │   ├── DESIGNER.md
+│   │   ├── PUBLISHER.md
+│   │   ├── VOICE_INTENT.md
+│   │   ├── VOICE_PAULI.md
+│   │   ├── VOICE_BAMBU.md
+│   │   ├── VOICE_&lt;other-characters&gt;.md
+│   │   ├── HANDLERS/
+│   │   │   ├── revenue.new_trend.md
+│   │   │   ├── revenue.product_created.md
+│   │   │   ├── council.debate_request.md
+│   │   │   ├── payment.settled.md
+│   │   │   ├── lounge.humans_in_the_loop_cue.md
+│   │   │   └── (one file per event type)
+│   │   └── POSTING/
+│   │       ├── instagram.md
+│   │       ├── tiktok.md
+│   │       ├── x.md
+│   │       ├── linkedin.md
+│   │       ├── youtube.md
+│   │       ├── threads.md
+│   │       ├── reddit.md
+│   │       └── (one per Zernio platform in use)
+│   ├── context/
+│   │   ├── REPO_MAP.md
+│   │   ├── EVENT_BUS.md
+│   │   ├── ENVELOPES.md
+│   │   ├── TASK_PROFILES.md
+│   │   ├── CHARACTER_REGISTRY.md
+│   │   ├── ZERNIO_PERSONAS.md
+│   │   ├── PLATFORM_MATCH.md
+│   │   ├── PLATFORM_SCHEDULE.md
+│   │   ├── FACE_BLENDSHAPES.md
+│   │   ├── OPEN_BRAIN_SCHEMA.md
+│   │   └── LOUNGE_ZONES.md
+│   └── memory/
+│       ├── ops/
+│       │   └── &lt;YYYY-MM-DD&gt;/
+│       │       └── &lt;correlation_id&gt;/
+│       │           ├── plan.json
+│       │           ├── &lt;work_id&gt;.json
+│       │           ├── &lt;work_id&gt;.judge.json
+│       │           └── emitted.jsonl
+│       ├── decisions/
+│       │   └── &lt;YYYY-MM-DD&gt;_&lt;topic-slug&gt;.md
+│       ├── voice_logs/
+│       │   └── &lt;YYYY-MM-DD&gt;/
+│       │       └── &lt;session-id&gt;.jsonl
+│       └── patterns/
+│           └── &lt;pattern-slug&gt;.md
+└── (rest of the repo)
+</pre>
+
+<h2>4. Rules the layout enforces</h2>
+<ol>
+<li><strong>Instructions never reference specific models.</strong> They reference task profiles from <code>context/TASK_PROFILES.md</code>. Swap models at the gateway, not in prompts.</li>
+<li><strong>Context files are the only place API contracts live.</strong> An agent that touches Zernio reads <code>context/ZERNIO_PERSONAS.md</code>. An agent that touches the event bus reads <code>context/EVENT_BUS.md</code>. No agent guesses.</li>
+<li><strong>Memory is write-once per file.</strong> An agent that wants to update a report writes a new file with a new timestamp — never overwrites.</li>
+<li><strong>The <code>ops/</code> tree is rotated after 30 days.</strong> Older reports either promoted to <code>patterns/</code> (self-improvement decides) or deleted.</li>
+<li><strong>The <code>patterns/</code> tree is the compound-learning surface.</strong> When the self-improvement loop finds a recurring win (or loss), it promotes it here. Every agent reads <code>patterns/</code> before its own task.</li>
+</ol>
+
+<h2>5. Portability check — the model-swap test</h2>
+<div class="info">
+The whole layout passes if you can take any prompt file from <code>icm/instructions/</code>, hand it to a fresh model with no other context, and get a valid envelope back. If a prompt cannot survive that test, it is not portable — it has a model-specific assumption baked in and must be rewritten.
+</div>
+
+<h2>6. Acceptance criteria</h2>
+<ol>
+<li>All four repos have the same top-level <code>icm/</code> folder shape.</li>
+<li>Every file in the tree in section 3 exists (empty files are acceptable — mere presence proves the discipline).</li>
+<li>A lint (part of CI) checks that no prompt in <code>instructions/</code> references a specific model name.</li>
+<li>A test hands a random prompt to a stand-in model and validates the returned envelope shape.</li>
+<li>The 30-day rotation of <code>ops/</code> is a nightly job.</li>
+</ol>
+
+</body></html>

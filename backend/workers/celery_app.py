@@ -13,7 +13,7 @@ app.conf.update(
     enable_utc=True,
     worker_prefetch_multiplier=1,
     task_acks_late=True,
-    imports=('workers.tasks', 'workers.boot_task'),
+    imports=('workers.tasks', 'workers.boot_task', 'workers.channel_ticks'),
 )
 
 # Beat schedule - automated tasks
@@ -78,6 +78,38 @@ app.conf.beat_schedule = {
     'watcher-improvement': {
         'task': 'workers.tasks.watcher_improvement',
         'schedule': 3600.0,  # Every hour
+    },
+
+    # --- Six revenue channel ticks (spec §04 R-06) ---
+    'ch1-affiliate-morning': {
+        'task': 'workers.channel_ticks.ch1_tick_task',
+        'schedule': crontab(hour=8, minute=15),
+    },
+    'ch2-domains-daily': {
+        'task': 'workers.channel_ticks.ch2_tick_task',
+        'schedule': crontab(hour=9, minute=0),
+    },
+    'ch3-services-morning': {
+        'task': 'workers.channel_ticks.ch3_tick_task',
+        'schedule': crontab(hour=10, minute=30),
+    },
+    'ch4-microapps-afternoon': {
+        'task': 'workers.channel_ticks.ch4_tick_task',
+        'schedule': crontab(hour=13, minute=0),
+    },
+    'ch5-ebooks-evening': {
+        'task': 'workers.channel_ticks.ch5_tick_task',
+        'schedule': crontab(hour=17, minute=0),
+    },
+    'ch6-thrift-night': {
+        'task': 'workers.channel_ticks.ch6_tick_task',
+        'schedule': crontab(hour=21, minute=0),
+    },
+
+    # --- Nightly self-improvement loop (spec §09 R-07) ---
+    'self-improve-nightly': {
+        'task': 'workers.channel_ticks.self_improve_task',
+        'schedule': crontab(hour=3, minute=0),  # 03:00 UTC
     },
 }
 
