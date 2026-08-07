@@ -13,6 +13,7 @@ import {
   TrendingUp,
   Target
 } from 'lucide-react';
+import { demo } from '@/lib/demo';
 
 const API_URL = '';
 
@@ -33,11 +34,14 @@ export default function ResearchLabPage() {
     if (!researchTopic) return;
     setLoading(true);
     try {
-      const data = await fetch(`${API_URL}/api/research-lab/research`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: researchTopic, depth: researchDepth })
-      }).then(r => r.json());
+      let data;
+      try {
+        data = await fetch(`${API_URL}/api/research-lab/research`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic: researchTopic, depth: researchDepth })
+        }).then(r => r.json());
+      } catch { data = await demo.research(researchTopic, researchDepth); }
       setResult(data);
     } catch (e) {
       console.error(e);
@@ -54,11 +58,14 @@ export default function ResearchLabPage() {
       if (ideaMethod === 'etsy_autocomplete') params.keyword = ideaParams.keyword;
       if (ideaMethod === 'review_mine') params.competitor_url = ideaParams.competitor_url;
 
-      const data = await fetch(`${API_URL}/api/research-lab/ideas`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ method: ideaMethod, params })
-      }).then(r => r.json());
+      let data;
+      try {
+        data = await fetch(`${API_URL}/api/research-lab/ideas`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ method: ideaMethod, params })
+        }).then(r => r.json());
+      } catch { data = await demo.ideas(ideaMethod, params); }
       setIdeaResult(data);
     } catch (e) {
       console.error(e);
@@ -366,18 +373,30 @@ function WikiTab() {
   const API_URL_LOCAL = '';
 
   useEffect(() => {
-    fetch(`${API_URL_LOCAL}/api/research-lab/wiki/stats`).then(r => r.json()).then(setStats).catch(() => {});
+    const load = async () => {
+      try {
+        const r = await fetch(`${API_URL_LOCAL}/api/research-lab/wiki/stats`);
+        if (!r.ok) throw new Error('no backend');
+        setStats(await r.json());
+      } catch {
+        demo.wikiStats().then(setStats);
+      }
+    };
+    load();
   }, []);
 
   const handleSearch = async () => {
     if (!query) return;
     setLoading(true);
     try {
-      const data = await fetch(`${API_URL_LOCAL}/api/research-lab/wiki/search`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, limit: 20 })
-      }).then(r => r.json());
+      let data;
+      try {
+        data = await fetch(`${API_URL_LOCAL}/api/research-lab/wiki/search`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, limit: 20 })
+        }).then(r => r.json());
+      } catch { data = await demo.wikiSearch(query); }
       setResults(data.results || []);
     } catch (e) {
       console.error(e);
@@ -448,7 +467,11 @@ function CostsTab() {
   const API_URL_LOCAL = '';
 
   useEffect(() => {
-    fetch(`${API_URL_LOCAL}/api/research-lab/costs`).then(r => r.json()).then(setCosts).catch(() => {});
+    const load = async () => {
+      const r = await fetch(`${API_URL_LOCAL}/api/research-lab/costs`).then(r => r.json()).catch(() => null);
+      setCosts(r || await demo.costs());
+    };
+    load();
   }, []);
 
   if (!costs) return <div className="text-gray-400">Loading costs...</div>;

@@ -1,18 +1,29 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Package, DollarSign, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Package } from 'lucide-react';
+import { demo } from '@/lib/demo';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/products/')
-      .then(r => r.json())
-      .then(d => setProducts(d.items || []))
-      .catch(() => setProducts([]))
-      .finally(() => setLoading(false));
+    const load = async () => {
+      try {
+        const r = await fetch('/api/products/');
+        if (!r.ok) throw new Error('no backend');
+        const d = await r.json();
+        setProducts(d.items || []);
+      } catch {
+        // Backend offline → embedded studio demo so the storefront never feels dead
+        const d = await demo.products(12);
+        setProducts(d.items || []);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, []);
 
   return (

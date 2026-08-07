@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { Brain, Cpu, DollarSign, Activity, Zap, MessageSquare, TrendingUp, Eye, Shield } from 'lucide-react';
 import { hemmes, Envelope } from '@/lib/loungeApi';
+import { demo } from '@/lib/demo';
 
 const API_URL = '';
 const WS_URL = typeof window !== 'undefined'
@@ -57,8 +58,16 @@ export default function ObservationPage() {
   // Hermes health + envelopes feed (the Yappyverse L1-L4 observability layer)
   useEffect(() => {
     const fetchHermes = async () => {
-      try { setHermes(await hemmes.health()); } catch {}
-      try { const r = await hemmes.envelopes(60); setEnvelopes(r.envelopes || []); } catch {}
+      try { setHermes(await hemmes.health()); } catch {
+        try { setHermes(await demo.health()); } catch {}
+      }
+      try {
+        const r = await hemmes.envelopes(60);
+        setEnvelopes(r.envelopes || []);
+      } catch {
+        const r = await demo.envelopes(60);
+        setEnvelopes(r.envelopes || []);
+      }
     };
     fetchHermes();
     const t = setInterval(fetchHermes, 4000);
@@ -68,29 +77,39 @@ export default function ObservationPage() {
   // Fetch logs periodically
   useEffect(() => {
     const fetchLogs = async () => {
+      let data: any = null;
       try {
-        const data = await fetch(`${API_URL}/api/research-lab/logs?limit=50`).then(r => r.json());
-        if (data.logs) {
-          setLogs(data.logs.reverse());
-          // Update agent active states
-          const recentModels = new Set(data.logs.slice(-10).map((l: LogEntry) => l.model));
-          setAgents(prev => prev.map(a => ({
-            ...a,
-            active: recentModels.has(a.name)
-          })));
-        }
-      } catch (e) {}
+        data = await fetch(`${API_URL}/api/research-lab/logs?limit=50`).then(r => r.json());
+      } catch { /* backend down */ }
+      if (!data?.logs) data = { logs: demo.logs(50) };
+      if (data.logs) {
+        setLogs(data.logs.slice(-50).reverse());
+        // Update agent active states
+        const recentModels = new Set(data.logs.slice(-10).map((l: LogEntry) => l.model));
+        setAgents(prev => prev.map(a => ({
+          ...a,
+          active: recentModels.has(a.name)
+        })));
+      }
     };
 
     const fetchCosts = async () => {
       try {
         const data = await fetch(`${API_URL}/api/research-lab/costs`).then(r => r.json());
         setCosts(data);
-      } catch (e) {}
+      } catch {
+        demo.costs().then(setCosts);
+      }
+    };
+
+    const fetchDelibs = async () => {
+      // Backend endpoint may not exist; demo council fills the arena
+      setCouncilDelibs(demo.councilDelibs());
     };
 
     fetchLogs();
     fetchCosts();
+    fetchDelibs();
     const interval = setInterval(() => {
       fetchLogs();
       fetchCosts();

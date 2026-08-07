@@ -1,5 +1,6 @@
 // Yappyverse API helpers for the lounge + observation
 // Backend: http://localhost:8000 or NEXT_PUBLIC_API_BASE_URL
+import { demo, AVATAR_ROSTER } from './demo';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 
@@ -12,6 +13,10 @@ export async function fetchAPI<T>(path: string, init?: RequestInit): Promise<T> 
     throw new Error(`API ${res.status}: ${await res.text()}`);
   }
   return res.json();
+}
+
+function withDemo<T>(real: () => Promise<T>, demoFn: () => T | Promise<T>): Promise<T> {
+  return real().catch(() => (demoFn() as Promise<T>));
 }
 
 export interface HermesHealth {
@@ -57,20 +62,27 @@ export interface LoungeState {
 }
 
 export const hemmes = {
-  health: () => fetchAPI<HermesHealth>('/api/hermes/health'),
+  health: () => withDemo(() => fetchAPI<HermesHealth>('/api/hermes/health'), () => demo.health()),
   envelopes: (limit?: number) =>
-    fetchAPI<{ envelopes: Envelope[] }>(`/api/envelopes/recent?limit=${limit ?? 30}`),
+    withDemo<{ envelopes: Envelope[] }>(() => fetchAPI<{ envelopes: Envelope[] }>(`/api/envelopes/recent?limit=${limit ?? 30}`), () => demo.envelopes(limit ?? 30)),
 };
 
 export const lounge = {
-  state: () => fetchAPI<LoungeState>('/api/lounge/state'),
-  scenes: (limit?: number) => fetchAPI<{ scenes: Envelope[] }>(`/api/lounge/scenes?limit=${limit ?? 20}`),
+  state: () => withDemo<LoungeState>(() => fetchAPI<LoungeState>('/api/lounge/state'), () => demo.loungeState()),
+  scenes: (limit?: number) =>
+    withDemo<{ scenes: Envelope[] }>(() => fetchAPI<{ scenes: Envelope[] }>(`/api/lounge/scenes?limit=${limit ?? 20}`), () => demo.scenes(limit ?? 20)),
 };
 
 export const voice = {
   command: (transcript: string) =>
-    fetchAPI<Envelope>('/api/voice/command', {
-      method: 'POST',
-      body: JSON.stringify({ transcript }),
-    }),
+    withDemo<Envelope>(
+      () =>
+        fetchAPI<Envelope>('/api/voice/command', {
+          method: 'POST',
+          body: JSON.stringify({ transcript }),
+        }),
+      () => demo.envelopes(1).then((r) => r.envelopes[0])
+    ),
 };
+
+export { AVATAR_ROSTER };
