@@ -86,13 +86,6 @@ async def call_printed(
     so the calling agent can self-correct (printed CLIs have actionable errors).
     """
     exe = binary_path(api_name)
-    if exe is None:
-        return {
-            "ok": False,
-            "reason": "not_built",
-            "available_clis": list_printed_clis(),
-            "hint": f"Run: cli-printing-press generate --spec <openapi.json> --name {api_name}",
-        }
 
     final_args = list(args)
     if agent_mode and "--agent" not in final_args:
@@ -102,11 +95,21 @@ async def call_printed(
     if extra_env:
         env.update(extra_env)
 
-    # L4 sanity: verify no secret values are passed in args (LLMs may try this)
+    # L4 sanity: verify no secret values are passed in args (LLMs may try this).
+    # Run this BEFORE the not-built check so the guard is enforced identically
+    # whether or not a CLI binary is installed on this machine.
     for a in final_args:
         for suspect in ("sk-", "ghp_", "sbp_", "r8_", "rk_live_", "Bearer", "token="):
             if suspect in a and not a.startswith("--"):
                 return {"ok": False, "reason": "L4_secret_in_args", "argument": a[:40] + "..."}
+
+    if exe is None:
+        return {
+            "ok": False,
+            "reason": "not_built",
+            "available_clis": list_printed_clis(),
+            "hint": f"Run: cli-printing-press generate --spec <openapi.json> --name {api_name}",
+        }
 
     try:
         proc = await asyncio.create_subprocess_exec(

@@ -5,10 +5,7 @@ from pydantic import BaseModel
 from typing import Optional
 from models.base import get_db
 from services.payment_service import payment_service, Payment, PaymentStatus
-<<<<<<< HEAD
 from services.ledger_service import reconcile_event
-=======
->>>>>>> origin/main
 
 router = APIRouter(prefix="/api/payments", tags=["payments"])
 
@@ -66,7 +63,6 @@ async def create_btcpay_invoice(payment_id: str):
 
 @router.post("/webhooks/creem")
 async def creem_webhook(req: Request):
-<<<<<<< HEAD
     """Handle Creem webhook — pass 1) payment_service for DB write, 2) ledger_service for R-05 orchestration."""
     payload = await req.json()
     result = await payment_service.handle_creem_webhook(payload)
@@ -93,17 +89,11 @@ async def creem_webhook(req: Request):
         except Exception as e:
             result["ledger_orchestration_error"] = str(e)[:300]
 
-=======
-    """Handle Creem webhook"""
-    payload = await req.json()
-    result = await payment_service.handle_creem_webhook(payload)
->>>>>>> origin/main
     return result
 
 
 @router.post("/webhooks/btcpay")
 async def btcpay_webhook(req: Request):
-<<<<<<< HEAD
     """Handle BTCPay Server webhook — same pattern."""
     payload = await req.json()
     result = await payment_service.handle_btcpay_webhook(payload)
@@ -124,11 +114,6 @@ async def btcpay_webhook(req: Request):
         except Exception as e:
             result["ledger_orchestration_error"] = str(e)[:300]
 
-=======
-    """Handle BTCPay Server webhook"""
-    payload = await req.json()
-    result = await payment_service.handle_btcpay_webhook(payload)
->>>>>>> origin/main
     return result
 
 
