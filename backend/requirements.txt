@@ -16,3 +16,6 @@ python-multipart==0.0.6
 websockets==12.0
 Pillow==10.1.0
 playwright==1.40.0
+
+# Agent integration bus / hosted MCP sessions
+composio==0.18.2
