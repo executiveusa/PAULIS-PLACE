@@ -1,1 +1,155 @@
-# PAULIS-PLACE
+# Pauli's Place
+
+**Pauli's Place is a bilingual, voice-first autonomous business operating environment.** A human states intent in plain English or Mexican Spanish, talks directly to persistent cartoon AI agents, and observes those agents collaborate inside a live 3D world while the real work happens underneath through missions, tools, computers, models, integrations, evidence, approvals, and measurable outcomes.
+
+## North Star
+
+> Human intent → Pauli mission → autonomous execution → verified outcome.
+
+The human should not have to operate Git, Docker, cloud infrastructure, model routing, MCP servers, schedulers, or deployment tooling. Those remain implementation details behind Pauli and the other agents.
+
+## Core product layers
+
+- **Pauli Voice** — web/mobile voice, phone, and messaging entry points; English first, Mexican Spanish second; mixed-language conversations supported.
+- **Mission Control** — durable typed missions, tasks, budgets, approvals, evidence, checkpoints, and outcome state.
+- **Agent Runtime** — model-independent agents with persistent identity, heart/soul files, skills, memory, and runtime adapters.
+- **AutoModel Router** — chooses the best adequate model by capability, privacy, latency, price, and historical results.
+- **Pauli Compute** — logical agent workstations with local, Docker, Hostinger/Coolify, Windows, RunPod, and Orgo-fallback providers.
+- **Pauli Integrations Bus** — Composio-backed SaaS connectivity plus native integrations for critical deterministic systems.
+- **Factory Kernel** — deterministic sequencing, tests, retries, evidence, Guardian review, and Gauntlet quality loops.
+- **Pauli Signal** — experiments, revenue attribution, treasury rules, cost tracking, and SCALE/ITERATE/HOLD/KILL decisions.
+- **Pauli's World** — live 3D observability where avatars correspond to real agents and real operational state.
+- **Pauli Studio** — programmatic and generative media from verified world/business events.
+
+## Product rules
+
+- Canonical spelling is **Pauli**, **Pauli's Place**, and **Pauli's World**.
+- Real companies are strict tenants with isolated memory, credentials, budgets, agents, communications, and records.
+- Zero-cost reversible work is autonomous.
+- Pauli may approve reversible paid work up to the configured policy ceiling.
+- Production site launches, outbound email, new outbound-call campaigns, proposals, irreversible actions, and frontier-model use require human approval.
+- External approvals are scoped capabilities, not blanket permission.
+- No agent may claim completion without objective evidence required by the mission acceptance contract.
+- The 3D world must display real backend state rather than fabricated activity.
+- Ordinary work loops until the requested outcome is achieved or a real circuit breaker is reached.
+
+## Composio integration
+
+Composio is the broad SaaS integration fabric, not the Pauli control plane. Pauli retains tenant identity, mission authority, approvals, auditing, and budgets.
+
+Current implementation:
+
+- tenant/actor-scoped Composio entity IDs
+- autonomous read-only sessions using read-only tool hints
+- explicit toolkit allowlists
+- hosted MCP session support for compatible runtimes
+- human account-connection flow
+- approval-gated action-session contract
+- dormant behavior when `COMPOSIO_API_KEY` is absent
+
+See `docs/integrations/COMPOSIO.md`.
+
+## Control-plane database
+
+The canonical Supabase/Postgres schema is versioned at:
+
+`backend/supabase/migrations/20260809_paulis_place_control_plane.sql`
+
+It defines tenant isolation and the shared operational spine for:
+
+- tenants and memberships
+- persistent agents
+- missions and mission events
+- tasks
+- scoped approvals
+- compute sessions
+- evidence
+- integration connections
+- world locations and agent presence
+- experiments
+- treasury entries
+- office/document references
+
+RLS is enabled on all tenant-owned tables. A user must be a member of a tenant to read or write tenant data. Public world data should be projected through explicit public APIs rather than by weakening tenant policies.
+
+## Current applications
+
+```text
+frontend/     Next.js application, dashboards, approvals, research, observation, integrations, 3D lounge/world prototype
+backend/      FastAPI API, agents, services, model routing, event bus, workers, payments, research, voice, integrations
+icm/          durable context and operating artifacts
+beads/        work tracking
+printed-clis/ CLI/tooling experiments and adapters
+```
+
+## Development
+
+### Backend
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+alembic upgrade head
+uvicorn main:app --reload --port 8000
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### Tests
+
+```bash
+cd backend
+PYTHONPATH=. pytest -q
+```
+
+Composio-focused tests:
+
+```bash
+cd backend
+PYTHONPATH=. pytest -q tests/test_composio.py
+```
+
+## Environment
+
+Copy `.env.example` and provide only the integrations you intend to activate. Missing optional providers should remain dormant rather than crash the system.
+
+Important variables include:
+
+- `DATABASE_URL`
+- `REDIS_URL`
+- `COMPOSIO_API_KEY`
+- model-provider keys
+- Twilio/voice credentials when enabled
+- Vercel/Coolify/compute provider credentials when enabled
+
+Never commit secrets.
+
+## Deployment direction
+
+- **Vercel** — mobile/web frontend and previews.
+- **Hostinger + Coolify** — persistent backend, workers, schedulers, and owned CPU workloads.
+- **Supabase/Postgres** — canonical multi-tenant control-plane data.
+- **RunPod/Fal** — specialized GPU/media workloads where appropriate.
+- **Orgo** — fallback computer provider while Pauli Compute reaches full provider coverage.
+
+## Golden Path #001
+
+The first full-system acceptance mission is:
+
+> “Pauli, find a nonprofit that clearly needs a better conversion website, research it, build a personalized superior prototype, deploy the preview, and call me when it's ready.”
+
+The first run stops before contacting the nonprofit. It must create the mission, research the opportunity, assemble agents, provision compute, build and visually verify a preview, produce evidence, update world state and office records, and notify the human through the configured voice/telephony path.
+
+## Gauntlet rule
+
+For every meaningful output, establish a named comparable reference bar. A builder produces the artifact; an independent fresh-context critic compares the real artifact against the reference, chooses a winner, identifies the single largest gap, and returns the gap for repair. The loop ends only when our output wins, the defined outcome is achieved, or a genuine budget/authority/safety/external circuit breaker applies.
+
+Scores such as “8/10” are not completion evidence.

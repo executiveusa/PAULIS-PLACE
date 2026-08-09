@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     stripe_secret_key: str = ""
     stripe_publishable: str = ""
 
+    # Integrations bus (Composio)
+    composio_api_key: str = ""
+
     # Zernio
     zernio_api_token: str = ""
 

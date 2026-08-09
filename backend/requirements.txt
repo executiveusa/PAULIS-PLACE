@@ -16,3 +16,5 @@ python-multipart==0.0.6
 websockets==12.0
 Pillow==10.1.0
 playwright==1.40.0
+
+# Composio integration uses the hosted API over httpx; no SDK dependency required.
