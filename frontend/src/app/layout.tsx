@@ -2,17 +2,17 @@ import './globals.css';
 import { Sidebar } from '@/components/Sidebar';
 
 export const metadata = {
-  title: 'DigiFactory - Autonomous Digital Products',
-  description: 'AI-powered digital product factory',
+  title: "Pauli's Place — Autonomous Business OS",
+  description: "Speak the outcome. Pauli and the agents handle the work underneath.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="bg-gray-950 text-white min-h-screen">
-        <div className="flex h-screen">
+      <body className="min-h-screen bg-[#080807] text-stone-100">
+        <div className="min-h-screen md:flex">
           <Sidebar />
-          <main className="flex-1 overflow-auto">
+          <main className="min-w-0 flex-1 md:ml-[248px]">
             {children}
           </main>
         </div>
