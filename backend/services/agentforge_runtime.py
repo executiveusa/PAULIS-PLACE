@@ -56,14 +56,17 @@ class AgentForgeRuntime:
         self.timeout = max(10, int(SETTINGS.agentforge_timeout_seconds))
 
     async def _run(self, *args: str, cwd: Optional[Path] = None, timeout: int = 20) -> tuple[int, str, str]:
-        proc = await asyncio.create_subprocess_exec(
-            self.python,
-            *args,
-            cwd=str(cwd) if cwd else None,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env={**os.environ, "PYTHONUNBUFFERED": "1"},
-        )
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                self.python,
+                *args,
+                cwd=str(cwd) if cwd else None,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env={**os.environ, "PYTHONUNBUFFERED": "1"},
+            )
+        except OSError as exc:
+            raise AgentForgeRuntimeError(f"AgentForge Python runtime unavailable: {exc}") from exc
         try:
             stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
         except asyncio.TimeoutError:
@@ -83,11 +86,22 @@ class AgentForgeRuntime:
                 detail="AGENTFORGE_ENABLED=false",
             )
 
-        code, out, err = await self._run(
-            "-c",
-            "import agentforge; print(getattr(agentforge, '__version__', 'installed'))",
-            timeout=12,
-        )
+        try:
+            code, out, err = await self._run(
+                "-c",
+                "import agentforge; print(getattr(agentforge, '__version__', 'installed'))",
+                timeout=12,
+            )
+        except AgentForgeRuntimeError as exc:
+            return AgentForgeHealth(
+                configured=True,
+                installed=False,
+                status="needs_install",
+                python=self.python,
+                project_dir=str(self.project_dir),
+                detail=str(exc)[:300],
+            )
+
         installed = code == 0
         project_ready = self.project_dir.exists()
         status = "ready" if installed and project_ready else ("installed_needs_project" if installed else "needs_install")
