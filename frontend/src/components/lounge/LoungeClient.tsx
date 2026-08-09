@@ -1,175 +1,127 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useState } from 'react';
-import { lounge as loungeApi, Envelope } from '@/lib/loungeApi';
+import { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, CircleAlert, Clapperboard, Mic, Radio, UserRound, Users } from 'lucide-react';
+import Link from 'next/link';
+import { api, PauliAgent } from '@/lib/api';
+import { lounge as loungeApi, Envelope, DEMO_ENABLED } from '@/lib/loungeApi';
 import { useVoiceCommand } from './useVoiceCommand';
-import { demo, AVATAR_ROSTER } from '@/lib/demo';
+import type { WorldMode } from './ThreeScene';
 
-// Three.js must be client-side only
 const ThreeScene = dynamic(() => import('./ThreeScene'), { ssr: false });
 
-const INTENT_TIPS: Record<string, string> = {
-  who_owns:     "say \"who owns this place\"",
-  whats_hot:    "say \"what's hot tonight\"",
-  how_is_money: "say \"how's the money\"",
-  post_that:    "say \"post that\"",
-  whos_paying:  "say \"who's paying\" or \"confirmation\"",
-  tell_about:   "say \"tell me about the new drop\"",
-  cut_it:       "say \"cut it\" — Niko roasts",
-  human_moment: "say \"human moment\" — Mira cutaway",
-};
-
-const DEFAULT_STATE = {
-  lounge: "Paulie's Place",
-  setting: 'Seattle 2056 · jazz lounge · 3D observable world',
-  avatars: AVATAR_ROSTER.map((a) => ({ ...a })),
-  schedule_cue: 'the house band tunes up…',
-};
-
 export default function LoungeClient() {
-  const [state, setState] = useState(DEFAULT_STATE);
-  const [backendUp, setBackendUp] = useState<boolean | null>(null);
+  const [agents, setAgents] = useState<PauliAgent[]>([]);
+  const [selected, setSelected] = useState<PauliAgent | null>(null);
   const [scenes, setScenes] = useState<Envelope[]>([]);
-  const [speaker, setSpeaker] = useState<string | null>(null);
+  const [mode, setMode] = useState<WorldMode>('live');
+  const [backendStatus, setBackendStatus] = useState<'checking'|'live'|'offline'>('checking');
 
-  useEffect(() => {
-    let cancelled = false;
-    let demoFeed: ReturnType<typeof setInterval> | null = null;
-
-    loungeApi.state().then((s) => {
-      if (cancelled) return;
-      if (s && s.avatars && s.avatars.length) setState(s);
-      setBackendUp(true);
-    }).catch(() => {
-      if (cancelled) return;
-      setBackendUp(false);
-      setState(DEFAULT_STATE);
-      // Local ambient feed so the lounge never feels dead
-      demoFeed = setInterval(() => {
-        demo.scenes(1).then((r) => {
-          setScenes((prev) => [r.scenes[0], ...prev].slice(0, 12));
-        });
-      }, 2600);
-    });
-
-    loungeApi.scenes(12).then((r) => setScenes(r.scenes)).catch(() => {});
-
-    const wsBase = process.env.NEXT_PUBLIC_LOUNGE_WS_URL || 'ws://localhost:8000/ws';
-    let ws: WebSocket | null = null;
+  const load = async () => {
     try {
-      ws = new WebSocket(wsBase);
-      ws.onmessage = (m) => {
-        try {
-          const data = JSON.parse(m.data);
-          if (data?.type === 'event' && data.envelope?.route?.startsWith('R-02')) {
-            setScenes((s) => [data.envelope, ...s].slice(0, 12));
-            setBackendUp(true);
-          }
-          if (data?.type === 'event' && data.envelope?.route?.startsWith('R-04')) {
-            setScenes((s) => [data.envelope, ...s].slice(0, 12));
-            setSpeaker(data.envelope?.body?.target_avatar);
-            setTimeout(() => setSpeaker(null), 3500);
-          }
-        } catch {}
-      };
-    } catch {}
-
-    return () => {
-      cancelled = true;
-      if (demoFeed) clearInterval(demoFeed);
-      ws?.close();
-    };
-  }, []);
-
-  const onAccept = (env: Envelope) => {
-    setScenes((s) => [env, ...s].slice(0, 12));
-    const spk = env?.body?.target_avatar;
-    if (spk) {
-      setSpeaker(spk);
-      setTimeout(() => setSpeaker(null), 3500);
+      const response = await api.controlPlane.agents();
+      setAgents(response.agents);
+      setSelected((current) => current || response.agents.find(a => a.agent_key === 'pauli') || response.agents[0] || null);
+      setBackendStatus('live');
+    } catch {
+      setAgents([]);
+      setSelected(null);
+      setBackendStatus('offline');
     }
+    loungeApi.scenes(16).then(r => setScenes(r.scenes)).catch(() => {});
   };
 
+  useEffect(() => {
+    load();
+    const poll = setInterval(load, 15000);
+    const wsUrl = process.env.NEXT_PUBLIC_LOUNGE_WS_URL || process.env.NEXT_PUBLIC_WS_URL;
+    let ws: WebSocket | undefined;
+    if (wsUrl) {
+      try {
+        ws = new WebSocket(wsUrl);
+        ws.onmessage = (message) => {
+          try {
+            const data = JSON.parse(message.data);
+            if (data?.type === 'event' && data.envelope) {
+              setScenes(prev => [data.envelope, ...prev].slice(0, 16));
+              setBackendStatus('live');
+            }
+          } catch {}
+        };
+      } catch {}
+    }
+    return () => { clearInterval(poll); ws?.close(); };
+  }, []);
+
+  const onAccept = (env: Envelope) => setScenes(prev => [env, ...prev].slice(0, 16));
   const { listening, transcript, error, lastResponse, start, stop } = useVoiceCommand({ onAccept });
 
+  const activeAgents = useMemo(() => agents.filter(a => ['working','meeting','recovering'].includes(a.status)).length, [agents]);
+
   return (
-    <div className="min-h-screen bg-[#0A0714] text-[#E6DCFF]">
-      <header className="px-8 py-6 border-b border-[#2A1F3D] flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl italic font-serif text-[#FF6432]">Paulie's Place</h1>
-          <p className="text-sm text-[#6B5F8A]">Seattle 2056 · jazz lounge · 3D observable world</p>
+    <div className="min-h-screen bg-[#080807] text-stone-100 flex flex-col">
+      <header className="relative z-20 border-b border-white/[0.08] bg-[#090908]/88 backdrop-blur-xl px-4 md:px-6 py-3.5 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <Link href="/" className="h-9 w-9 shrink-0 rounded-full border border-white/10 grid place-items-center text-stone-500 hover:text-white hover:bg-white/5"><ArrowLeft className="w-4 h-4" /></Link>
+          <div className="min-w-0"><div className="eyebrow">Pauli's World</div><div className="text-sm font-semibold truncate mt-1">Pauli's Place · Seattle after hours</div></div>
         </div>
-        <div className="flex items-center gap-3">
-          {backendUp === false && (
-            <span className="text-xs text-[#C8AA32] border border-[#C8AA32]/40 rounded-full px-3 py-1">
-              live studio demo — backend offline
-            </span>
-          )}
-          <button
-            onClick={listening ? stop : start}
-            className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors
-              ${listening ? 'bg-[#FF6432] text-white animate-pulse' : 'bg-[#C8AA32] text-[#0A0714]'}`}
-          >
-            {listening ? 'Listening… (tap to stop)' : 'Hold to speak (Jarvis)'}
-          </button>
+        <div className="flex items-center gap-2">
+          <div className="hidden sm:flex rounded-full border border-white/10 p-1 bg-black/30">
+            <button onClick={() => setMode('live')} className={`px-3 py-1.5 rounded-full text-[11px] flex items-center gap-1.5 ${mode === 'live' ? 'bg-stone-100 text-stone-950 font-semibold' : 'text-stone-500'}`}><Radio className="w-3 h-3" />Live</button>
+            <button onClick={() => setMode('director')} className={`px-3 py-1.5 rounded-full text-[11px] flex items-center gap-1.5 ${mode === 'director' ? 'bg-stone-100 text-stone-950 font-semibold' : 'text-stone-500'}`}><Clapperboard className="w-3 h-3" />Director cut</button>
+          </div>
+          <button onClick={listening ? stop : start} className={`h-9 px-3.5 rounded-full border text-xs font-medium flex items-center gap-2 transition ${listening ? 'bg-red-500 border-red-400 text-white animate-pulse' : 'border-white/10 bg-white/[0.04] text-stone-300 hover:bg-white/[0.08]'}`}><Mic className="w-3.5 h-3.5" />{listening ? 'Listening…' : `Talk${selected ? ` to ${selected.name}` : ''}`}</button>
         </div>
       </header>
 
-      {error && (
-        <div className="px-8 py-3 bg-[#3A0A0A] border-b border-[#E05A5A] text-[#E05A5A] text-sm">
-          {error}
-        </div>
-      )}
+      <main className="flex-1 grid xl:grid-cols-[1fr_330px] min-h-0">
+        <section className="relative min-h-[540px] xl:min-h-[calc(100vh-65px)] overflow-hidden">
+          <ThreeScene agents={agents} selectedAgentId={selected?.id} onSelectAgent={setSelected} mode={mode} />
 
-      <main className="grid lg:grid-cols-[1fr_360px] gap-6 px-8 py-6">
-        <section className="space-y-4">
-          <ThreeScene
-            avatars={state.avatars}
-            speakingAvatarId={speaker}
-            sceneCue={state.schedule_cue}
-          />
-
-          <div className="rounded-2xl border border-[#2A1F3D] bg-[#140F1E] p-5">
-            <h2 className="font-serif italic text-[#FF6432] mb-3">Try saying</h2>
-            <div className="grid grid-cols-2 gap-2 text-xs text-[#A080E0]">
-              {Object.entries(INTENT_TIPS).map(([k, v]) => (
-                <div key={k} className="px-3 py-2 bg-[#1A1230] rounded-md">{v}</div>
-              ))}
+          <div className="absolute bottom-4 left-4 right-4 md:right-auto md:w-[430px] z-10 pauli-panel p-4 bg-black/70">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2"><span className={`status-dot ${backendStatus === 'live' ? 'status-live' : backendStatus === 'offline' ? 'status-bad' : 'status-warn'}`} /><span className="eyebrow !tracking-[.14em]">{backendStatus === 'live' ? 'Real control-plane state' : 'Control plane unavailable'}</span></div>
+                <div className="mt-2 text-sm font-medium">{selected ? `${selected.name} · ${selected.role}` : 'Click an avatar to talk directly'}</div>
+                <div className="text-xs text-stone-500 mt-1.5 leading-relaxed">{selected?.specialty || 'Avatars appear only when registered in the Pauli control plane. Their movement is presentation; their work status comes from real agent state.'}</div>
+              </div>
+              {selected && <div className="text-[10px] uppercase tracking-[.15em] text-stone-600 capitalize whitespace-nowrap">{selected.status.replaceAll('_',' ')}</div>}
             </div>
+            {transcript && <div className="mt-3 pt-3 border-t border-white/[0.07] text-xs text-stone-300"><span className="text-stone-600">You:</span> {transcript}</div>}
+            {error && <div className="mt-3 text-xs text-red-300 flex items-start gap-2"><CircleAlert className="w-3.5 h-3.5 mt-0.5" />{error}</div>}
+            {lastResponse?.halt && <div className="mt-3 text-xs text-amber-200">Guardian stopped that action before execution.</div>}
           </div>
-
-          {transcript && (
-            <div className="rounded-md border border-[#2A1F3D] bg-[#0F3A2A] px-4 py-3 text-[#4DC99A]">
-              <span className="opacity-70">You said: </span>{transcript}
-            </div>
-          )}
-          {lastResponse?.halt && (
-            <div className="rounded-md border border-[#E05A5A] bg-[#3A0A0A] px-4 py-3 text-[#E05A5A]">
-              SAFETY_JUDGE halted: {lastResponse?.body?.reason || 'unknown'}
-            </div>
-          )}
         </section>
 
-        <aside className="space-y-4">
-          <div className="rounded-2xl border border-[#2A1F3D] bg-[#140F1E] p-5">
-            <h2 className="font-serif italic text-[#FF6432] mb-3">Live scenes feed</h2>
-            <ul className="space-y-2 text-xs max-h-[460px] overflow-y-auto">
-              {scenes.length === 0 && <li className="text-[#6B5F8A]">house lights up… be the first seed</li>}
-              {scenes.map((s) => (
-                <li key={s.event_id + s.ts} className="px-3 py-2 bg-[#0A0714] rounded">
-                  <div className="text-[#C8AA32] font-mono text-[10px] tracking-wider">{s.route} · {s.stage}</div>
-                  <div className="text-[#E6DCFF] mt-1">
-                    {s.body?.response_text || s.body?.lounge_scene_intent ||
-                      s.body?.celebration_intent || JSON.stringify(s.body).slice(0, 140)}
-                  </div>
-                  <div className="text-[#6B5F8A] mt-1 text-[10px]">{s.ts}</div>
-                </li>
-              ))}
-            </ul>
+        <aside className="hidden xl:flex border-l border-white/[0.07] bg-[#0a0a09] flex-col min-h-0">
+          <div className="p-5 border-b border-white/[0.06]">
+            <div className="eyebrow">The room</div>
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              <Metric icon={Users} value={agents.length} label="agents here" />
+              <Metric icon={Radio} value={activeAgents} label="working" />
+            </div>
+            {DEMO_ENABLED && <div className="mt-3 rounded-xl border border-amber-500/15 bg-amber-500/[0.04] px-3 py-2 text-[10px] text-amber-200/70">Explicit demo mode is enabled.</div>}
+          </div>
+
+          <div className="p-5 flex-1 overflow-y-auto scrollbar-thin">
+            <div className="flex items-center justify-between"><div className="eyebrow">Live scene feed</div><span className="text-[10px] text-stone-700">truth layer</span></div>
+            <div className="mt-4 space-y-2">
+              {scenes.length === 0 && <div className="rounded-xl border border-dashed border-white/[0.08] px-4 py-7 text-center"><UserRound className="w-4 h-4 mx-auto text-stone-700 mb-2" /><div className="text-xs text-stone-500">No real scene events yet.</div><div className="text-[10px] text-stone-700 mt-1">Nothing is invented to make the room look busy.</div></div>}
+              {scenes.map(scene => <SceneCard key={`${scene.event_id}:${scene.ts}`} scene={scene} />)}
+            </div>
           </div>
         </aside>
       </main>
     </div>
   );
+}
+
+function Metric({ icon: Icon, value, label }: { icon:any; value:number; label:string }) {
+  return <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-3"><Icon className="w-3.5 h-3.5 text-stone-700" /><div className="text-xl font-semibold mt-3">{value}</div><div className="text-[10px] text-stone-600 mt-1">{label}</div></div>;
+}
+
+function SceneCard({ scene }: { scene: Envelope }) {
+  const summary = scene.body?.response_text || scene.body?.lounge_scene_intent || scene.body?.celebration_intent || scene.next_action || `${scene.route} · ${scene.stage}`;
+  return <div className="rounded-xl border border-white/[0.06] bg-black/25 p-3"><div className="text-[9px] uppercase tracking-[.15em] text-stone-700">{scene.route} · {scene.stage}</div><div className="text-xs text-stone-400 mt-1.5 leading-relaxed line-clamp-3">{String(summary)}</div><div className="text-[9px] text-stone-700 mt-2">{scene.ts}</div></div>;
 }
