@@ -13,6 +13,7 @@ import {
   Brain,
   Eye,
   Music,
+  PlugZap,
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -23,7 +24,8 @@ const navItems = [
   { href: '/queue', label: 'Approval Queue', icon: ClipboardCheck },
   { href: '/research', label: 'Research Lab', icon: Brain },
   { href: '/observation', label: 'Observation', icon: Eye },
-  { href: '/lounge', label: "Paulie's Place 3D", icon: Music },
+  { href: '/lounge', label: "Pauli's World", icon: Music },
+  { href: '/integrations', label: 'Integrations', icon: PlugZap },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -38,8 +40,8 @@ export function Sidebar() {
             <Zap className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="font-bold text-lg">Paulie's Place</h1>
-            <p className="text-xs text-gray-400">Yappyverse Factory</p>
+            <h1 className="font-bold text-lg">Pauli's Place</h1>
+            <p className="text-xs text-gray-400">Autonomous Business OS</p>
           </div>
         </div>
       </div>
@@ -82,6 +84,5 @@ export function Sidebar() {
 }
 
 function CostDisplay() {
-  // This would fetch from API
   return '0.00';
 }
