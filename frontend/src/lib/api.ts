@@ -61,6 +61,19 @@ export const api = {
     summary: () => withDemo(() => fetchJSON<TaskSummary>('/api/tasks/summary'), () => D.taskSummary()),
     errors: () => withDemo(() => fetchJSON<Task[]>(`/api/tasks/recent-errors`), () => D.tasks().filter((t: any) => t.status === 'failed')),
   },
+  integrations: {
+    composioStatus: () => fetchJSON<ComposioStatus>('/api/integrations/composio/status'),
+    createReadSession: (tenantId: string, actorId: string, toolkits: string[]) =>
+      fetchJSON<ComposioSession>('/api/integrations/composio/sessions/read', {
+        method: 'POST',
+        body: JSON.stringify({ tenant_id: tenantId, actor_id: actorId, toolkits }),
+      }),
+    connectToolkit: (sessionId: string, toolkit: string, callbackUrl?: string) =>
+      fetchJSON<ComposioConnection>(`/api/integrations/composio/sessions/${sessionId}/connect`, {
+        method: 'POST',
+        body: JSON.stringify({ toolkit, callback_url: callbackUrl }),
+      }),
+  },
   triggers: {
     scanTrends: () => withDemo(() => fetchJSON<{ status: string }>('/api/trigger/scan-trends', { method: 'POST' }), () => ({ status: 'queued' })),
     scoreTrends: () => withDemo(() => fetchJSON<{ status: string }>('/api/trigger/score-trends', { method: 'POST' }), () => ({ status: 'queued' })),
@@ -101,4 +114,25 @@ export interface Trend {
 
 export interface ProductIdea {
   type: string; angle: string; prompt_direction: string;
+}
+
+export interface ComposioStatus {
+  provider: string;
+  configured: boolean;
+  status: 'ready' | 'waiting_for_credentials';
+  capabilities: string[];
+}
+export interface ComposioSession {
+  session_id: string;
+  pauli_entity_id: string;
+  access_mode: 'read' | 'action';
+  toolkits: string[];
+  mcp_url?: string;
+  warnings?: Array<Record<string, unknown>>;
+}
+export interface ComposioConnection {
+  redirect_url?: string;
+  link_url?: string;
+  connection_status?: string;
+  [key: string]: unknown;
 }
