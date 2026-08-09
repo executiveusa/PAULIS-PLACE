@@ -10,6 +10,7 @@ from api import dashboard, products, tasks, approvals
 from api import research_lab, payments, council, memory
 from api import health as health_api
 from api import voice as voice_api
+from api import integrations as integrations_api
 from api import printing_press as pp_api
 from services import hermes as hermes_service
 from services import event_bus as event_bus_service
@@ -55,6 +56,7 @@ app.include_router(memory.router, tags=["memory"])
 app.include_router(health_api.router, tags=["health"])
 app.include_router(voice_api.router, tags=["voice"])
 app.include_router(pp_api.router, tags=["printing-press"])
+app.include_router(integrations_api.router)
 
 # WebSocket for real-time updates
 class ConnectionManager:
