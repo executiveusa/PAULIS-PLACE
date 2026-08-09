@@ -3,8 +3,8 @@ import dynamic from 'next/dynamic';
 const LoungeClient = dynamic(() => import('@/components/lounge/LoungeClient'), { ssr: false });
 
 export const metadata = {
-  title: "Paulie's Place · 3D Lounge",
-  description: 'Yappyverse 3D observable world — voice Jarvis, avatars, real-time agent scenes',
+  title: "Pauli's World · Live 3D Operations",
+  description: "A live, voice-first 3D view of Pauli's Place agents, missions and meetings.",
 };
 
 export default function LoungePage() {
