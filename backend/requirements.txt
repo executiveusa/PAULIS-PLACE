@@ -17,5 +17,4 @@ websockets==12.0
 Pillow==10.1.0
 playwright==1.40.0
 
-# Agent integration bus / hosted MCP sessions
-composio==0.18.2
+# Composio integration uses the hosted API over httpx; no SDK dependency required.
