@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { CircleAlert, Clock3, Filter, RefreshCw, ShieldCheck, Workflow } from 'lucide-react';
+import { AlertCircle, Clock3, RefreshCw, ShieldCheck, Workflow } from 'lucide-react';
 import { api, Mission } from '@/lib/api';
 import { IntentComposer } from '@/components/IntentComposer';
 
@@ -34,16 +34,13 @@ export default function MissionsPage() {
           <div><div className="eyebrow">Mission Control</div><h1 className="text-2xl md:text-3xl font-semibold tracking-tight mt-1">Outcomes, not tickets</h1><p className="text-sm text-stone-500 mt-2 max-w-2xl">Every mission carries authority, budget, agents, evidence and a completion contract. “Done” means the requested outcome happened.</p></div>
           <button onClick={load} className="h-10 w-10 rounded-full border border-white/10 grid place-items-center text-stone-500 hover:text-white hover:bg-white/5"><RefreshCw className="w-4 h-4" /></button>
         </div>
-
         <IntentComposer compact onCreated={() => setTimeout(load, 200)} />
-
         <div className="mt-5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-xs text-stone-500"><span className={`status-dot ${status === 'ready' ? 'status-live' : 'status-warn'}`} />{status.replaceAll('_',' ')}</div>
           <div className="flex rounded-full border border-white/10 p-1 bg-black/20">
             {(['active','all'] as const).map((value) => <button key={value} onClick={() => setFilter(value)} className={`px-3 py-1.5 rounded-full text-xs capitalize ${filter === value ? 'bg-stone-100 text-stone-950 font-semibold' : 'text-stone-500'}`}>{value}</button>)}
           </div>
         </div>
-
         <div className="mt-4 space-y-3">
           {visible.length === 0 ? (
             <div className="pauli-panel min-h-[280px] grid place-items-center text-center p-8"><div><Workflow className="w-6 h-6 mx-auto text-stone-700 mb-3" /><p className="text-stone-400 text-sm">No {filter} missions.</p><p className="text-xs text-stone-600 mt-1">Give Pauli an intent above to create the first real mission.</p></div></div>
@@ -73,7 +70,7 @@ function MissionCard({ mission }: { mission: Mission }) {
         <Mini icon={Clock3} label="Attempts" value={String(mission.attempt_count)} />
         <div><div className="text-[10px] uppercase tracking-[0.16em] text-stone-700">Autonomy envelope</div><div className="flex items-center justify-between text-xs text-stone-400 mt-2"><span>${(mission.spent_cents/100).toFixed(2)} spent</span><span>${(mission.autonomous_budget_cents/100).toFixed(2)} max</span></div><div className="mt-2 h-1 rounded-full bg-white/[0.06] overflow-hidden"><div className="h-full bg-stone-400" style={{ width: `${pct}%` }} /></div></div>
       </div>
-      {(needsHuman || blocked) && <div className={`mt-4 rounded-xl border p-3 text-xs flex items-start gap-2 ${needsHuman ? 'border-amber-500/15 bg-amber-500/[0.04] text-amber-100/70' : 'border-red-500/15 bg-red-500/[0.04] text-red-100/70'}`}><CircleAlert className="w-3.5 h-3.5 mt-0.5" />{needsHuman ? 'This mission is waiting for a consequential human approval.' : 'This mission is blocked. Pauli should exhaust materially different strategies within the approved envelope before escalating.'}</div>}
+      {(needsHuman || blocked) && <div className={`mt-4 rounded-xl border p-3 text-xs flex items-start gap-2 ${needsHuman ? 'border-amber-500/15 bg-amber-500/[0.04] text-amber-100/70' : 'border-red-500/15 bg-red-500/[0.04] text-red-100/70'}`}><AlertCircle className="w-3.5 h-3.5 mt-0.5" />{needsHuman ? 'This mission is waiting for a consequential human approval.' : 'This mission is blocked. Pauli should exhaust materially different strategies within the approved envelope before escalating.'}</div>}
     </article>
   );
 }
