@@ -18,15 +18,20 @@ app.conf.update(
         'workers.boot_task',
         'workers.channel_ticks',
         'workers.mission_control',
+        'workers.task_execution',
     ),
 )
 
-# Beat schedule. Mission Control is the durable orchestrator; legacy product/revenue
-# workers remain specialized capabilities and must not self-certify mission completion.
+# Mission Control owns durable state. Task Execution claims only ready bounded
+# work and requires provider evidence for actuator work.
 app.conf.beat_schedule = {
     'pauli-mission-control': {
         'task': 'workers.mission_control.tick',
         'schedule': 5.0,
+    },
+    'pauli-task-execution': {
+        'task': 'workers.task_execution.tick',
+        'schedule': 3.0,
     },
     'scan-trends-morning': {
         'task': 'workers.tasks.scan_all_trends',
