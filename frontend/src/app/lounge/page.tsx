@@ -1,10 +1,8 @@
-import dynamic from 'next/dynamic';
-
-const LoungeClient = dynamic(() => import('@/components/lounge/LoungeClient'), { ssr: false });
+import LoungeClient from '@/components/lounge/LoungeClient';
 
 export const metadata = {
-  title: "Paulie's Place · 3D Lounge",
-  description: 'Yappyverse 3D observable world — voice Jarvis, avatars, real-time agent scenes',
+  title: "Pauli's World · Observable Agent Lounge",
+  description: "Pauli's World is the 3D observable projection of live missions, agents, and verified system events.",
 };
 
 export default function LoungePage() {
