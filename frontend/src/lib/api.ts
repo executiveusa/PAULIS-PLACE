@@ -1,41 +1,35 @@
-import { demo } from './demo';
-
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-export let isDemoMode = false;
-export function setDemoMode(v: boolean) { isDemoMode = v; }
-
-async function fetchJSON<T>(path: string, options?: RequestInit): Promise<T> {
-  try {
-    const res = await fetch(`${API_URL}${path}`, {
-      headers: { 'Content-Type': 'application/json' },
-      ...options,
-    });
-    if (!res.ok) throw new Error(`API error: ${res.status}`);
-    const data = await res.json();
-    setDemoMode(false);
-    return data as T;
-  } catch (e) {
-    setDemoMode(true);
-    throw e;
+export class PauliApiError extends Error {
+  constructor(public status: number, public path: string, message: string) {
+    super(message);
+    this.name = 'PauliApiError';
   }
 }
 
-// Endpoints below each fall back to the embedded demo engine when the real
-// backend is unreachable, so the app is never an empty skeleton.
-const D = demo as any;
-
-function withDemo<T>(real: () => Promise<T>, demoFn: () => T | Promise<T>): Promise<T> {
-  return (async () => {
-    try { return await real(); } catch { setDemoMode(true); return (await demoFn()) as T; }
-  })();
+async function fetchJSON<T>(path: string, options?: RequestInit): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      ...options,
+    });
+  } catch (error) {
+    throw new PauliApiError(0, path, `Backend unavailable: ${error instanceof Error ? error.message : 'network error'}`);
+  }
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new PauliApiError(res.status, path, detail || `API error ${res.status}`);
+  }
+  return res.json() as Promise<T>;
 }
 
 export const api = {
   dashboard: {
-    getStats: () => withDemo(() => fetchJSON<DashboardStats>('/api/dashboard/stats'), () => D.dashboardStats()),
-    getRevenueChart: (days = 30) => withDemo(() => fetchJSON<RevenueData[]>(`/api/dashboard/revenue-chart?days=${days}`), () => D.revenueChart(days)),
-    getNiches: () => withDemo(() => fetchJSON<NicheData[]>('/api/dashboard/niches'), () => D.niches()),
+    getStats: () => fetchJSON<DashboardStats>('/api/dashboard/stats'),
+    getRevenueChart: (days = 30) => fetchJSON<RevenueData[]>(`/api/dashboard/revenue-chart?days=${days}`),
+    getNiches: () => fetchJSON<NicheData[]>('/api/dashboard/niches'),
   },
   products: {
     list: (params?: ProductFilters) => {
@@ -43,23 +37,23 @@ export const api = {
       if (params?.platform) searchParams.set('platform', params.platform);
       if (params?.status) searchParams.set('status', params.status);
       if (params?.niche) searchParams.set('niche', params.niche);
-      return withDemo(() => fetchJSON<ProductListResponse>(`/api/products/?${searchParams}`), () => D.products());
+      return fetchJSON<ProductListResponse>(`/api/products/?${searchParams}`);
     },
-    get: (id: number) => withDemo(() => fetchJSON<Product>(`/api/products/${id}`), () => D.products().then((r: any) => r.items.find((p: any) => p.id === id) || r.items[0])),
-    getImage: (id: number) => withDemo(() => fetchJSON<{ base64: string }>(`/api/products/${id}/image`), () => ({ base64: '' })),
+    get: (id: number) => fetchJSON<Product>(`/api/products/${id}`),
+    getImage: (id: number) => fetchJSON<{ base64: string }>(`/api/products/${id}/image`),
   },
   approvals: {
-    getQueue: () => withDemo(() => fetchJSON<ApprovalQueue>('/api/approvals/queue'), () => D.approvalQueue()),
+    getQueue: () => fetchJSON<ApprovalQueue>('/api/approvals/queue'),
     process: (productIds: number[], action: 'approve' | 'reject' | 'publish') =>
-      withDemo(() => fetchJSON<{ results: ApprovalResult[] }>('/api/approvals/action', {
+      fetchJSON<{ results: ApprovalResult[] }>('/api/approvals/action', {
         method: 'POST',
         body: JSON.stringify({ product_ids: productIds, action }),
-      }), () => ({ results: productIds.map((id) => ({ id, status: action })) })),
+      }),
   },
   tasks: {
-    list: (status?: string) => withDemo(() => fetchJSON<Task[]>(`/api/tasks/${status ? `?status=${status}` : ''}`), () => D.tasks()),
-    summary: () => withDemo(() => fetchJSON<TaskSummary>('/api/tasks/summary'), () => D.taskSummary()),
-    errors: () => withDemo(() => fetchJSON<Task[]>(`/api/tasks/recent-errors`), () => D.tasks().filter((t: any) => t.status === 'failed')),
+    list: (status?: string) => fetchJSON<Task[]>(`/api/tasks/${status ? `?status=${status}` : ''}`),
+    summary: () => fetchJSON<TaskSummary>('/api/tasks/summary'),
+    errors: () => fetchJSON<Task[]>('/api/tasks/recent-errors'),
   },
   integrations: {
     composioStatus: () => fetchJSON<ComposioStatus>('/api/integrations/composio/status'),
@@ -75,9 +69,9 @@ export const api = {
       }),
   },
   triggers: {
-    scanTrends: () => withDemo(() => fetchJSON<{ status: string }>('/api/trigger/scan-trends', { method: 'POST' }), () => ({ status: 'queued' })),
-    scoreTrends: () => withDemo(() => fetchJSON<{ status: string }>('/api/trigger/score-trends', { method: 'POST' }), () => ({ status: 'queued' })),
-    createProducts: () => withDemo(() => fetchJSON<{ status: string }>('/api/trigger/create-products', { method: 'POST' }), () => ({ status: 'queued' })),
+    scanTrends: () => fetchJSON<{ status: string }>('/api/trigger/scan-trends', { method: 'POST' }),
+    scoreTrends: () => fetchJSON<{ status: string }>('/api/trigger/score-trends', { method: 'POST' }),
+    createProducts: () => fetchJSON<{ status: string }>('/api/trigger/create-products', { method: 'POST' }),
   },
 };
 
@@ -87,14 +81,12 @@ export interface DashboardStats {
   trends: { hot: number; breakout: number };
   tasks: { running: number; failed: number };
 }
-
 export interface Product {
   id: number; external_id: string; platform: string; product_type: string;
   title: string; description: string; tags: string[]; niche: string;
   price: number; status: string; views: number; sales: number; revenue: number;
   created_at: string; research_data?: any;
 }
-
 export interface Task { id: number; task_type: string; status: string; ai_cost: number; created_at: string; }
 export interface ApprovalQueue { pending: Product[]; ready_to_publish: Product[]; }
 export interface ApprovalResult { id: number; status: string; message?: string; }
@@ -103,7 +95,6 @@ export interface ProductListResponse { total: number; items: Product[]; }
 export interface RevenueData { date: string; products_created: number; revenue: number; }
 export interface NicheData { id: number; niche: string; avg_price: number; updated_at: string; }
 export interface TaskSummary { [taskType: string]: { pending?: number; running?: number; completed?: number; failed?: number; }; }
-
 export interface Trend {
   id: number; keyword: string; niche: string; interest_score: number;
   change_7d: number; change_30d: number; opportunity_score: number;
@@ -111,28 +102,12 @@ export interface Trend {
   is_breakout: boolean; is_seasonal: boolean; is_evergreen: boolean;
   products_created: number; last_scanned: string;
 }
-
-export interface ProductIdea {
-  type: string; angle: string; prompt_direction: string;
-}
-
-export interface ComposioStatus {
-  provider: string;
-  configured: boolean;
-  status: 'ready' | 'waiting_for_credentials';
-  capabilities: string[];
-}
+export interface ProductIdea { type: string; angle: string; prompt_direction: string; }
+export interface ComposioStatus { provider: string; configured: boolean; status: 'ready' | 'waiting_for_credentials'; capabilities: string[]; }
 export interface ComposioSession {
-  session_id: string;
-  pauli_entity_id: string;
-  access_mode: 'read' | 'action';
-  toolkits: string[];
-  mcp_url?: string;
-  warnings?: Array<Record<string, unknown>>;
+  session_id: string; pauli_entity_id: string; access_mode: 'read' | 'action'; toolkits: string[];
+  mcp_url?: string; warnings?: Array<Record<string, unknown>>;
 }
 export interface ComposioConnection {
-  redirect_url?: string;
-  link_url?: string;
-  connection_status?: string;
-  [key: string]: unknown;
+  redirect_url?: string; link_url?: string; connection_status?: string; [key: string]: unknown;
 }
