@@ -1,26 +1,24 @@
-// Yappyverse API helpers for the lounge + observation
-// Backend: http://localhost:8000 or NEXT_PUBLIC_API_BASE_URL
-import { demo, AVATAR_ROSTER } from './demo';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+// Pauli's World API helpers. This layer is truth-only: when the backend is unavailable,
+// callers receive an explicit error instead of synthetic activity.
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export async function fetchAPI<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...init,
-  });
-  if (!res.ok) {
-    throw new Error(`API ${res.status}: ${await res.text()}`);
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      ...init,
+    });
+  } catch (error) {
+    throw new Error(`Pauli backend unavailable for ${path}: ${error instanceof Error ? error.message : 'network error'}`);
   }
+  if (!res.ok) throw new Error(`Pauli API ${res.status} for ${path}: ${await res.text()}`);
   return res.json();
 }
 
-function withDemo<T>(real: () => Promise<T>, demoFn: () => T | Promise<T>): Promise<T> {
-  return real().catch(() => (demoFn() as Promise<T>));
-}
-
 export interface HermesHealth {
-  status: 'ok' | 'cap_reached';
+  status: 'ok' | 'cap_reached' | 'offline';
   spent_usd: number;
   cap_usd: number;
   remaining_usd: number;
@@ -53,7 +51,6 @@ export interface LoungeAvatarState {
   model: string;
   state: string;
 }
-
 export interface LoungeState {
   lounge: string;
   setting: string;
@@ -61,28 +58,28 @@ export interface LoungeState {
   schedule_cue: string;
 }
 
+export const AVATAR_ROSTER = [
+  { id: 'pauli', name: 'Pauli', role: 'Executive agent' },
+  { id: 'scout', name: 'Scout', role: 'Research' },
+  { id: 'strategist', name: 'Strategist', role: 'Strategy' },
+  { id: 'builder', name: 'Builder', role: 'Engineering' },
+  { id: 'critic', name: 'Critic', role: 'Gauntlet' },
+  { id: 'guardian', name: 'Guardian', role: 'Safety & policy' },
+  { id: 'publisher', name: 'Publisher', role: 'Deployment' },
+  { id: 'sales', name: 'Sales', role: 'Revenue' },
+] as const;
+
 export const hemmes = {
-  health: () => withDemo(() => fetchAPI<HermesHealth>('/api/hermes/health'), () => demo.health()),
-  envelopes: (limit?: number) =>
-    withDemo<{ envelopes: Envelope[] }>(() => fetchAPI<{ envelopes: Envelope[] }>(`/api/envelopes/recent?limit=${limit ?? 30}`), () => demo.envelopes(limit ?? 30)),
+  health: () => fetchAPI<HermesHealth>('/api/hermes/health'),
+  envelopes: (limit?: number) => fetchAPI<{ envelopes: Envelope[] }>(`/api/envelopes/recent?limit=${limit ?? 30}`),
 };
-
 export const lounge = {
-  state: () => withDemo<LoungeState>(() => fetchAPI<LoungeState>('/api/lounge/state'), () => demo.loungeState()),
-  scenes: (limit?: number) =>
-    withDemo<{ scenes: Envelope[] }>(() => fetchAPI<{ scenes: Envelope[] }>(`/api/lounge/scenes?limit=${limit ?? 20}`), () => demo.scenes(limit ?? 20)),
+  state: () => fetchAPI<LoungeState>('/api/lounge/state'),
+  scenes: (limit?: number) => fetchAPI<{ scenes: Envelope[] }>(`/api/lounge/scenes?limit=${limit ?? 20}`),
 };
-
 export const voice = {
-  command: (transcript: string) =>
-    withDemo<Envelope>(
-      () =>
-        fetchAPI<Envelope>('/api/voice/command', {
-          method: 'POST',
-          body: JSON.stringify({ transcript }),
-        }),
-      () => demo.envelopes(1).then((r) => r.envelopes[0])
-    ),
+  command: (transcript: string) => fetchAPI<Envelope>('/api/voice/command', {
+    method: 'POST',
+    body: JSON.stringify({ transcript }),
+  }),
 };
-
-export { AVATAR_ROSTER };

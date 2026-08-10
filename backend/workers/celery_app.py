@@ -2,7 +2,7 @@ from celery import Celery
 from celery.schedules import crontab
 from config import SETTINGS
 
-app = Celery('digifactory')
+app = Celery("paulis_place")
 app.conf.update(
     broker_url=SETTINGS.redis_url,
     result_backend=SETTINGS.redis_url,
@@ -13,12 +13,21 @@ app.conf.update(
     enable_utc=True,
     worker_prefetch_multiplier=1,
     task_acks_late=True,
-    imports=('workers.tasks', 'workers.boot_task', 'workers.channel_ticks'),
+    imports=(
+        'workers.tasks',
+        'workers.boot_task',
+        'workers.channel_ticks',
+        'workers.mission_control',
+    ),
 )
 
-# Beat schedule - automated tasks
+# Beat schedule. Mission Control is the durable orchestrator; legacy product/revenue
+# workers remain specialized capabilities and must not self-certify mission completion.
 app.conf.beat_schedule = {
-    # Trend scanning - 4x daily
+    'pauli-mission-control': {
+        'task': 'workers.mission_control.tick',
+        'schedule': 5.0,
+    },
     'scan-trends-morning': {
         'task': 'workers.tasks.scan_all_trends',
         'schedule': crontab(hour=6, minute=0),
@@ -35,52 +44,38 @@ app.conf.beat_schedule = {
         'task': 'workers.tasks.scan_all_trends',
         'schedule': crontab(hour=0, minute=0),
     },
-
-    # Score trends - after each scan
     'score-hot-trends': {
         'task': 'workers.tasks.score_hot_trends',
         'schedule': crontab(hour='*/6', minute=30),
     },
-
-    # Research niches - weekly deep dive
     'weekly-niche-research': {
         'task': 'workers.tasks.research_all_niches',
-        'schedule': crontab(day_of_week=1, hour=2, minute=0),  # Monday 2am
+        'schedule': crontab(day_of_week=1, hour=2, minute=0),
     },
-
-    # Auto-create products from high-scoring trends
     'auto-create-products': {
         'task': 'workers.tasks.create_products_from_trends',
         'schedule': crontab(hour='*/3', minute=0),
     },
-
-    # Sync metrics - daily
     'sync-metrics': {
         'task': 'workers.tasks.sync_product_metrics',
         'schedule': crontab(hour=3, minute=0),
     },
-
-    # Cost guard check
     'cost-guard': {
         'task': 'workers.tasks.check_daily_cost',
         'schedule': crontab(hour='*/1', minute=0),
     },
-
-    # Watcher loops
     'watcher-observation': {
         'task': 'workers.tasks.watcher_observation',
-        'schedule': 30.0,  # Every 30 seconds
+        'schedule': 30.0,
     },
     'watcher-analysis': {
         'task': 'workers.tasks.watcher_analysis',
-        'schedule': 300.0,  # Every 5 minutes
+        'schedule': 300.0,
     },
     'watcher-improvement': {
         'task': 'workers.tasks.watcher_improvement',
-        'schedule': 3600.0,  # Every hour
+        'schedule': 3600.0,
     },
-
-    # --- Six revenue channel ticks (spec §04 R-06) ---
     'ch1-affiliate-morning': {
         'task': 'workers.channel_ticks.ch1_tick_task',
         'schedule': crontab(hour=8, minute=15),
@@ -105,11 +100,9 @@ app.conf.beat_schedule = {
         'task': 'workers.channel_ticks.ch6_tick_task',
         'schedule': crontab(hour=21, minute=0),
     },
-
-    # --- Nightly self-improvement loop (spec §09 R-07) ---
     'self-improve-nightly': {
         'task': 'workers.channel_ticks.self_improve_task',
-        'schedule': crontab(hour=3, minute=0),  # 03:00 UTC
+        'schedule': crontab(hour=3, minute=0),
     },
 }
 
