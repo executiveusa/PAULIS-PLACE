@@ -1,0 +1,50 @@
+opportunity_id: pauli-puzzle-limited-edition-001
+created_at: "2026-08-11T06:52:00Z"
+source_repo: executiveusa/wherespauli
+source_ref: "story/product concept: Pauli puzzles, The 12, color-pop clues"
+originating_agent: hermes
+category: product
+customer: "Seattle/PNW families, puzzle players, collectors, and supporters of Pauli-linked social-purpose work"
+problem_or_desire: "People want a tangible, replayable way to participate in the mystery rather than only watch it."
+offer_hypothesis: "A numbered limited-edition Pauli mystery puzzle, signed by a real artist, with a collectible authentication/digital-unlock card and a matched Collector Pair option (one sealed, one playable)."
+revenue_path: "direct preorder -> limited production/POD fulfillment -> collector upsell -> repeat puzzle drops"
+asset_or_ip:
+  - "Where's Pauli mystery world"
+  - "12-system / Seattle 12 motif"
+  - "black-and-white noir/stipple visual language"
+  - "color-pop clue mechanic"
+  - "Pauli puzzle/story generator"
+evidence:
+  - "Owner explicitly selected puzzles as the first go-to-market product family."
+  - "Print-on-demand puzzle fulfillment exists, reducing initial inventory exposure."
+  - "Where's Pauli already has reusable story/clue mechanics capable of making the product playable rather than decorative."
+assumptions:
+  - "Collectors will value artist signature + numbering + sealed-copy option enough to support a premium tier."
+  - "A puzzle can be produced at acceptable landed cost and quality without large inventory commitments."
+  - "Digital authentication/unlock utility can add value without delaying the physical preorder test."
+time_to_first_cash: "target <= 7 days from approved preorder page"
+expected_price: "PROPOSED: single $39-$59; Collector Pair $79-$109"
+estimated_variable_cost: "UNKNOWN until vendor/sample quote; must be measured before paid scale"
+estimated_gross_margin: "TARGET >= 55% before artist royalty, payment fees, support, and returns"
+startup_cost: "Cap first proof at <= $250 unless owner approves more"
+maintenance_burden: low
+strategic_fit: high
+reusable_ip: high
+black_swan_upside: high
+social_purpose_connection: "Commercial business may fund/support approved social-purpose work, but no donation percentage or beneficiary claim may be published until entity/terms are explicitly approved and recorded."
+entity_separation_notes: "Revenue belongs to the commercial Pauli's Place operation unless a separately documented transaction/commitment says otherwise. Do not describe purchase price as a charitable donation."
+recommended_smallest_test: "Launch a no-inventory preorder/waitlist page using one approved hero artwork and two offers: Single Play Edition and Collector Pair. Measure paid preorder or refundable reservation intent before ordering a production run."
+stop_conditions:
+  - "landed variable cost makes target gross contribution unattractive"
+  - "artist rights/signature agreement is not documented"
+  - "sample print quality fails visual/physical acceptance"
+  - "no qualified preorder signal after the agreed test traffic/sample"
+owner_gate:
+  - "approve final artwork and artist agreement"
+  - "approve edition size"
+  - "approve retail price"
+  - "approve initial spend above $250"
+  - "approve public social-purpose claims"
+  - "approve token/NFT rights or utility before sale"
+status: SCREENED
+next_action: "Obtain vendor unit economics and produce one preorder-ready product mock/sample specification."
