@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, Radio, WifiOff } from 'lucide-react';
 import { lounge as loungeApi, Envelope, LoungeState, AVATAR_ROSTER } from '@/lib/loungeApi';
+import { fetchPauliverseSnapshot, PauliverseSnapshot } from '@/lib/pauliverseApi';
 import { useVoiceCommand } from './useVoiceCommand';
 
 const ThreeScene = dynamic(() => import('./ThreeScene'), { ssr: false });
+const CommandWorld = dynamic(() => import('./CommandWorld'), { ssr: false });
 
 const POSITIONS: Array<[number, number, number]> = [
   [0, 0, 0], [-3.8, 0, -1.5], [3.8, 0, -1.5], [-5.4, 0, 2.2],
@@ -27,15 +29,31 @@ const EMPTY_STATE: LoungeState = {
   schedule_cue: 'Waiting for live world state',
 };
 
+type WorldMode = 'portfolio' | 'agents';
+
 export default function LoungeClient() {
+  const [mode, setMode] = useState<WorldMode>('portfolio');
   const [state, setState] = useState<LoungeState>(EMPTY_STATE);
   const [backendUp, setBackendUp] = useState<boolean | null>(null);
   const [scenes, setScenes] = useState<Envelope[]>([]);
   const [speaker, setSpeaker] = useState<string | null>(null);
   const [worldError, setWorldError] = useState('');
+  const [portfolio, setPortfolio] = useState<PauliverseSnapshot | null>(null);
+  const [portfolioError, setPortfolioError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
+
+    fetchPauliverseSnapshot().then((snapshot) => {
+      if (cancelled) return;
+      setPortfolio(snapshot);
+      setPortfolioError('');
+    }).catch((error) => {
+      if (cancelled) return;
+      setPortfolio(null);
+      setPortfolioError(error instanceof Error ? error.message : 'Portfolio snapshot unavailable');
+    });
+
     loungeApi.state().then((next) => {
       if (cancelled) return;
       setState(next);
@@ -69,7 +87,7 @@ export default function LoungeClient() {
               window.setTimeout(() => setSpeaker(null), 3500);
             }
           } catch {
-            // malformed realtime event: ignore, never synthesize state
+            // Malformed realtime event: ignore. Never synthesize operational state.
           }
         };
       } catch {
@@ -96,73 +114,95 @@ export default function LoungeClient() {
 
   return (
     <div className="min-h-screen bg-[#080808] text-stone-100">
-      <header className="flex items-center justify-between gap-5 border-b border-white/10 px-6 py-5 lg:px-8">
+      <header className="flex flex-wrap items-center justify-between gap-5 border-b border-white/10 px-6 py-5 lg:px-8">
         <div className="flex items-center gap-4">
           <Link href="/" className="border border-white/10 p-2 text-stone-500 hover:text-white" aria-label="Back to Mission Control">
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div>
-            <div className="text-[10px] uppercase tracking-[0.34em] text-amber-100/60">Observable world</div>
+            <div className="text-[10px] uppercase tracking-[0.34em] text-amber-100/60">Owner observation cockpit</div>
             <h1 className="mt-1 text-xl font-semibold">Pauli's World</h1>
-            <p className="mt-0.5 text-xs text-stone-500">Avatars mirror operational agent state. No synthetic activity.</p>
+            <p className="mt-0.5 text-xs text-stone-500">Portfolio topology, operational agents, evidence and gates. No fabricated activity.</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex border border-white/10 p-1 text-[10px] uppercase tracking-wider">
+            <button onClick={() => setMode('portfolio')} className={`px-3 py-1.5 ${mode === 'portfolio' ? 'bg-white text-black' : 'text-stone-500'}`}>Portfolio</button>
+            <button onClick={() => setMode('agents')} className={`px-3 py-1.5 ${mode === 'agents' ? 'bg-white text-black' : 'text-stone-500'}`}>Agent room</button>
+          </div>
           <span className={`flex items-center gap-2 border px-3 py-2 text-[10px] uppercase tracking-wider ${backendUp ? 'border-emerald-400/20 text-emerald-300' : 'border-red-400/20 text-red-300'}`}>
             {backendUp ? <Radio className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
-            {backendUp ? 'Live' : 'Backend offline'}
+            Agent backend {backendUp ? 'live' : 'offline'}
           </span>
           <button
             onClick={listening ? stop : start}
-            disabled={backendUp === false}
+            disabled={backendUp !== true}
             className="border border-white/10 bg-stone-100 px-4 py-2 text-xs font-semibold text-black disabled:cursor-not-allowed disabled:opacity-30"
           >
-            {listening ? 'Listening…' : 'Talk to the room'}
+            {listening ? 'Listening…' : 'Talk to Hermes'}
           </button>
         </div>
       </header>
 
-      {(error || worldError) && (
+      {(error || (mode === 'agents' && worldError) || (mode === 'portfolio' && portfolioError)) && (
         <div className="border-b border-red-400/20 bg-red-950/10 px-8 py-3 text-xs text-red-200">
-          {error || worldError}
+          {error || (mode === 'portfolio' ? portfolioError : worldError)}
         </div>
       )}
 
-      <main className="grid gap-6 px-6 py-6 lg:grid-cols-[1fr_360px] lg:px-8">
-        <section className="space-y-4">
-          <ThreeScene avatars={state.avatars} speakingAvatarId={speaker} sceneCue={state.schedule_cue} />
-          {transcript && (
-            <div className="border border-white/10 bg-[#0e0e0e] px-4 py-3 text-sm">
-              <span className="text-stone-500">You said: </span>{transcript}
+      {mode === 'portfolio' ? (
+        <main className="px-6 py-6 lg:px-8">
+          {portfolio ? (
+            <>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-[10px] uppercase tracking-wider text-stone-600">
+                <span>Source: {portfolio.source}</span>
+                <span>Snapshot: {portfolio.generated_at}</span>
+              </div>
+              <CommandWorld snapshot={portfolio} />
+            </>
+          ) : (
+            <div className="grid min-h-[520px] place-items-center border border-white/10 text-sm text-stone-600">
+              Loading authoritative portfolio graph…
             </div>
           )}
-          {lastResponse?.halt && (
-            <div className="border border-red-400/20 bg-red-950/10 px-4 py-3 text-sm text-red-200">
-              Guardian halted this request: {lastResponse?.body?.reason || 'policy or safety boundary'}
-            </div>
-          )}
-        </section>
+        </main>
+      ) : (
+        <main className="grid gap-6 px-6 py-6 lg:grid-cols-[1fr_360px] lg:px-8">
+          <section className="space-y-4">
+            <ThreeScene avatars={state.avatars} speakingAvatarId={speaker} sceneCue={state.schedule_cue} />
+            {transcript && (
+              <div className="border border-white/10 bg-[#0e0e0e] px-4 py-3 text-sm">
+                <span className="text-stone-500">You said: </span>{transcript}
+              </div>
+            )}
+            {lastResponse?.halt && (
+              <div className="border border-red-400/20 bg-red-950/10 px-4 py-3 text-sm text-red-200">
+                Guardian halted this request: {lastResponse?.body?.reason || 'policy or safety boundary'}
+              </div>
+            )}
+          </section>
 
-        <aside>
-          <div className="border border-white/10 bg-[#0e0e0e] p-5">
-            <div className="text-[10px] uppercase tracking-[0.28em] text-stone-500">Live event feed</div>
-            <ul className="mt-4 max-h-[640px] space-y-2 overflow-y-auto text-xs">
-              {scenes.length === 0 && (
-                <li className="border border-white/10 p-4 text-stone-600">No verified world events have been received.</li>
-              )}
-              {scenes.map((scene) => (
-                <li key={`${scene.event_id}-${scene.ts}`} className="border border-white/10 bg-black/20 p-3">
-                  <div className="font-mono text-[10px] uppercase tracking-wider text-amber-100/60">{scene.route} · {scene.stage}</div>
-                  <div className="mt-2 leading-5 text-stone-300">
-                    {scene.body?.response_text || scene.body?.public_summary || scene.body?.lounge_scene_intent || JSON.stringify(scene.body).slice(0, 160)}
-                  </div>
-                  <div className="mt-2 text-[10px] text-stone-600">{scene.ts}</div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </aside>
-      </main>
+          <aside>
+            <div className="border border-white/10 bg-[#0e0e0e] p-5">
+              <div className="text-[10px] uppercase tracking-[0.28em] text-stone-500">Verified event feed</div>
+              <ul className="mt-4 max-h-[640px] space-y-2 overflow-y-auto text-xs">
+                {scenes.length === 0 && (
+                  <li className="border border-white/10 p-4 text-stone-600">No verified world events have been received.</li>
+                )}
+                {scenes.map((scene) => (
+                  <li key={`${scene.event_id}-${scene.ts}`} className="border border-white/10 bg-black/20 p-3">
+                    <div className="font-mono text-[10px] uppercase tracking-wider text-amber-100/60">{scene.route} · {scene.stage}</div>
+                    <div className="mt-2 leading-5 text-stone-300">
+                      {scene.body?.response_text || scene.body?.public_summary || scene.body?.lounge_scene_intent || JSON.stringify(scene.body).slice(0, 160)}
+                    </div>
+                    <div className="mt-2 text-[10px] text-stone-600">{scene.ts}</div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </aside>
+        </main>
+      )}
     </div>
   );
 }
