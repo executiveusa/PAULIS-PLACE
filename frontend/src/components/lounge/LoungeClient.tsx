@@ -4,12 +4,13 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, Radio, WifiOff } from 'lucide-react';
-import { lounge as loungeApi, Envelope, LoungeState, AVATAR_ROSTER } from '@/lib/loungeApi';
+import { council as councilApi, lounge as loungeApi, Envelope, LoungeState, PortfolioDecision, AVATAR_ROSTER } from '@/lib/loungeApi';
 import { fetchPauliverseSnapshot, PauliverseSnapshot } from '@/lib/pauliverseApi';
 import { useVoiceCommand } from './useVoiceCommand';
 
 const ThreeScene = dynamic(() => import('./ThreeScene'), { ssr: false });
 const CommandWorld = dynamic(() => import('./CommandWorld'), { ssr: false });
+const CouncilChamber = dynamic(() => import('./CouncilChamber'), { ssr: false });
 
 const POSITIONS: Array<[number, number, number]> = [
   [0, 0, 0], [-3.8, 0, -1.5], [3.8, 0, -1.5], [-5.4, 0, 2.2],
@@ -29,15 +30,17 @@ const EMPTY_STATE: LoungeState = {
   schedule_cue: 'Waiting for live world state',
 };
 
-type WorldMode = 'portfolio' | 'agents';
+type WorldMode = 'portfolio' | 'council' | 'agents';
 
 export default function LoungeClient() {
   const [mode, setMode] = useState<WorldMode>('portfolio');
   const [state, setState] = useState<LoungeState>(EMPTY_STATE);
   const [backendUp, setBackendUp] = useState<boolean | null>(null);
   const [scenes, setScenes] = useState<Envelope[]>([]);
+  const [decisions, setDecisions] = useState<PortfolioDecision[]>([]);
   const [speaker, setSpeaker] = useState<string | null>(null);
   const [worldError, setWorldError] = useState('');
+  const [councilError, setCouncilError] = useState('');
   const [portfolio, setPortfolio] = useState<PauliverseSnapshot | null>(null);
   const [portfolioError, setPortfolioError] = useState('');
 
@@ -66,7 +69,21 @@ export default function LoungeClient() {
       setState(EMPTY_STATE);
     });
 
-    loungeApi.scenes(12).then((result) => setScenes(result.scenes)).catch(() => setScenes([]));
+    loungeApi.scenes(12).then((result) => {
+      if (!cancelled) setScenes(result.scenes);
+    }).catch(() => {
+      if (!cancelled) setScenes([]);
+    });
+
+    councilApi.portfolioDeliberations(12).then((result) => {
+      if (cancelled) return;
+      setDecisions(result.deliberations);
+      setCouncilError('');
+    }).catch((error) => {
+      if (cancelled) return;
+      setDecisions([]);
+      setCouncilError(error instanceof Error ? error.message : 'Council evidence unavailable');
+    });
 
     const configured = process.env.NEXT_PUBLIC_LOUNGE_WS_URL;
     let ws: WebSocket | null = null;
@@ -111,6 +128,7 @@ export default function LoungeClient() {
   };
 
   const { listening, transcript, error, lastResponse, start, stop } = useVoiceCommand({ onAccept });
+  const activeError = error || (mode === 'agents' ? worldError : mode === 'portfolio' ? portfolioError : councilError);
 
   return (
     <div className="min-h-screen bg-[#080808] text-stone-100">
@@ -122,12 +140,13 @@ export default function LoungeClient() {
           <div>
             <div className="text-[10px] uppercase tracking-[0.34em] text-amber-100/60">Owner observation cockpit</div>
             <h1 className="mt-1 text-xl font-semibold">Pauli's World</h1>
-            <p className="mt-0.5 text-xs text-stone-500">Portfolio topology, operational agents, evidence and gates. No fabricated activity.</p>
+            <p className="mt-0.5 text-xs text-stone-500">Portfolio topology, council dissent, operational agents, evidence and gates. No fabricated activity.</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex border border-white/10 p-1 text-[10px] uppercase tracking-wider">
             <button onClick={() => setMode('portfolio')} className={`px-3 py-1.5 ${mode === 'portfolio' ? 'bg-white text-black' : 'text-stone-500'}`}>Portfolio</button>
+            <button onClick={() => setMode('council')} className={`px-3 py-1.5 ${mode === 'council' ? 'bg-white text-black' : 'text-stone-500'}`}>Council</button>
             <button onClick={() => setMode('agents')} className={`px-3 py-1.5 ${mode === 'agents' ? 'bg-white text-black' : 'text-stone-500'}`}>Agent room</button>
           </div>
           <span className={`flex items-center gap-2 border px-3 py-2 text-[10px] uppercase tracking-wider ${backendUp ? 'border-emerald-400/20 text-emerald-300' : 'border-red-400/20 text-red-300'}`}>
@@ -144,13 +163,13 @@ export default function LoungeClient() {
         </div>
       </header>
 
-      {(error || (mode === 'agents' && worldError) || (mode === 'portfolio' && portfolioError)) && (
+      {activeError && (
         <div className="border-b border-red-400/20 bg-red-950/10 px-8 py-3 text-xs text-red-200">
-          {error || (mode === 'portfolio' ? portfolioError : worldError)}
+          {activeError}
         </div>
       )}
 
-      {mode === 'portfolio' ? (
+      {mode === 'portfolio' && (
         <main className="px-6 py-6 lg:px-8">
           {portfolio ? (
             <>
@@ -166,7 +185,23 @@ export default function LoungeClient() {
             </div>
           )}
         </main>
-      ) : (
+      )}
+
+      {mode === 'council' && (
+        <main className="px-6 py-6 lg:px-8">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/60">Evidence, not theater</div>
+              <h2 className="mt-2 text-lg font-semibold">Portfolio Council</h2>
+              <p className="mt-1 text-xs text-stone-500">Seven independent perspectives and Hermes synthesis. This surface is read-only; it cannot manufacture approvals or spend.</p>
+            </div>
+            <div className="text-[10px] uppercase tracking-wider text-stone-600">{decisions.length} persisted decisions</div>
+          </div>
+          <CouncilChamber decisions={decisions} />
+        </main>
+      )}
+
+      {mode === 'agents' && (
         <main className="grid gap-6 px-6 py-6 lg:grid-cols-[1fr_360px] lg:px-8">
           <section className="space-y-4">
             <ThreeScene avatars={state.avatars} speakingAvatarId={speaker} sceneCue={state.schedule_cue} />
