@@ -30,8 +30,24 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
 def _decision_root() -> Path:
-    return Path(__file__).resolve().parents[2] / "icm" / "memory" / "portfolio-decisions"
+    return _repo_root() / "icm" / "memory" / "portfolio-decisions"
+
+
+def _evidence_ref(path: Path) -> str:
+    """Return a stable repo-relative ref when possible, otherwise a truthful path.
+
+    Tests and alternate storage adapters may point the decision store outside the
+    repository root. That must not make an otherwise valid receipt disappear.
+    """
+    try:
+        return str(path.relative_to(_repo_root()))
+    except ValueError:
+        return str(path)
 
 
 def _parse_json(value: Any) -> dict:
@@ -72,10 +88,12 @@ def recent_deliberations(limit: int = 20) -> list[dict]:
     for file in root.glob("*/*.json"):
         try:
             payload = json.loads(file.read_text(encoding="utf-8"))
-            payload["_evidence_ref"] = str(file.relative_to(Path(__file__).resolve().parents[2]))
-            items.append(payload)
-        except Exception:
+        except (OSError, json.JSONDecodeError):
             continue
+        if not isinstance(payload, dict):
+            continue
+        payload["_evidence_ref"] = _evidence_ref(file)
+        items.append(payload)
     items.sort(key=lambda item: str(item.get("ts") or ""), reverse=True)
     return items[: max(1, min(limit, 100))]
 
@@ -135,7 +153,7 @@ async def deliberate(*, question: str, proposal: str, context: dict | str | None
         "status": "PROPOSED" if synthesis_payload.get("owner_gate") else "DECIDED",
     }
     evidence_path = _persist(decision_id, payload)
-    payload["evidence_ref"] = str(evidence_path.relative_to(Path(__file__).resolve().parents[2]))
+    payload["evidence_ref"] = _evidence_ref(evidence_path)
 
     envelope = build_envelope(
         route="R-03.COUNCIL.PORTFOLIO_DECISION",
