@@ -42,10 +42,11 @@ function buildPositions(nodes: PauliverseNode[]) {
   }
 
   const positions: Record<string, [number, number, number]> = {};
-  for (const [district, districtNodes] of grouped.entries()) {
+  for (const [district, districtNodes] of Array.from(grouped.entries())) {
     const radius = DISTRICT_RADIUS[district] || 12.2;
     districtNodes.forEach((node, index) => {
-      const angle = (Math.PI * 2 * index) / Math.max(districtNodes.length, 1) + DISTRICT_ORDER.indexOf(district) * 0.4;
+      const districtIndex = Math.max(0, DISTRICT_ORDER.indexOf(district));
+      const angle = (Math.PI * 2 * index) / Math.max(districtNodes.length, 1) + districtIndex * 0.4;
       const y = node.type === 'AGENT' ? 1.6 : node.type === 'OPPORTUNITY' ? 0.9 : node.type === 'DEPLOYMENT' ? -1.0 : 0;
       positions[node.id] = [Math.cos(angle) * radius, y, Math.sin(angle) * radius];
     });
