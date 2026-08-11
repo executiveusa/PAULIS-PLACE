@@ -7,10 +7,16 @@ on:
       - 'frontend/**'
       - 'vercel.json'
       - '.github/workflows/deploy-vercel.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'frontend/**'
+      - 'vercel.json'
+      - '.github/workflows/deploy-vercel.yml'
   workflow_dispatch:
 
 concurrency:
-  group: paulis-place-vercel-production
+  group: paulis-place-vercel-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -28,9 +34,33 @@ jobs:
           npm install --legacy-peer-deps
           npm run build
 
+  authority:
+    name: Vercel deployment authority
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Report deployment authority on pull requests
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo '::warning::VERCEL_TOKEN is not configured. Source can be reviewed, but production deployment remains human-gated.'
+          else
+            echo 'Vercel deployment authority is configured. Token value is never printed.'
+          fi
+      - name: Fail closed without deployment authority on production events
+        if: ${{ github.event_name != 'pull_request' }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo 'VERCEL_TOKEN is not configured. Production deployment is blocked until a token or Git connection is installed.'
+            exit 1
+          fi
+          echo 'Vercel deployment authority is configured. Token value is never printed.'
+
   deploy-production:
     name: Deploy production
-    needs: readiness
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: [readiness, authority]
     runs-on: ubuntu-latest
     env:
       VERCEL_ORG_ID: team_2MkWeFBaSCv7DOvEy0OlX4s3
@@ -41,23 +71,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Fail closed when deployment authority is not configured
-        if: ${{ env.VERCEL_TOKEN == '' }}
-        run: |
-          echo 'VERCEL_TOKEN is not configured. Source is verified, but production deploy is intentionally blocked.'
-          exit 1
       - name: Install Vercel CLI
-        if: ${{ env.VERCEL_TOKEN != '' }}
         run: npm install --global vercel@latest
       - name: Pull production project settings
-        if: ${{ env.VERCEL_TOKEN != '' }}
         working-directory: frontend
         run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
       - name: Build with Vercel production settings
-        if: ${{ env.VERCEL_TOKEN != '' }}
         working-directory: frontend
         run: vercel build --prod --token="$VERCEL_TOKEN"
       - name: Deploy prebuilt production artifact
-        if: ${{ env.VERCEL_TOKEN != '' }}
         working-directory: frontend
         run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
