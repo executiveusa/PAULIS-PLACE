@@ -3,7 +3,7 @@ import time
 import pytest
 from fastapi import HTTPException
 
-from services.approval_gate import issue_capability, verify_capability
+from backend.services.approval_gate import issue_capability, verify_capability
 
 
 def _configure(monkeypatch):
