@@ -5,7 +5,7 @@ Redis pub/sub for cross-process events + in-process WebSocket fan-out for
 the 3D lounge. Provides:
   - publish(envelope): broadcasts a typed event
   - subscribe(route, handler): registers a coroutine handler for a route
-  - replay(event_id): re-emits an envelope from icm/memory/ops/
+  - replay(event_id): loads an envelope from persistent operational memory
 
 Envelope schema: see icm/context/ENVELOPES.md
 """
@@ -17,6 +17,8 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Optional
+
+from services.memory_store import memory_path
 
 # Redis is optional in dev (fallback to in-process). Snap to SETTINGS.redis_url.
 _redis = None
@@ -78,10 +80,9 @@ def build_envelope(
 
 
 def _persist(envelope: dict) -> Path:
-    """Persist envelope to icm/memory/ops/<YYYY-MM-DD>/<event_id>.json"""
-    root = Path(__file__).resolve().parents[2]  # repo root
+    """Persist envelope under the configured shared operational-memory root."""
     day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    out_dir = root / "icm" / "memory" / "ops" / day
+    out_dir = memory_path("ops", day)
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{envelope['event_id']}.json"
     out_path.write_text(json.dumps(envelope, indent=2), encoding="utf-8")
@@ -93,17 +94,14 @@ async def publish(envelope: dict) -> None:
     _persist(envelope)
     route = envelope["route"]
 
-    # In-process async subscribers
     handlers = list(_subscriptions.get(route, [])) + list(_subscriptions.get("*", []))
     if handlers:
         await asyncio.gather(*(_safe_call(h, envelope) for h in handlers))
 
-    # WebSocket fans
     if _ws_connections:
         msg = json.dumps({"type": "event", "envelope": envelope})
         await asyncio.gather(*(_safe_ws_send(ws, msg) for ws in list(_ws_connections)))
 
-    # Redis pub/sub (best-effort)
     r = _ensure_redis()
     if r is not None:
         try:
@@ -145,13 +143,17 @@ def unregister_websocket(ws: Any) -> None:
 
 
 def replay(event_id: str) -> Optional[dict]:
-    """Load an envelope from disk by event_id (search ops/ tree)."""
-    root = Path(__file__).resolve().parents[2]
-    ops_dir = root / "icm" / "memory" / "ops"
+    """Load an envelope by event_id from persistent operational memory."""
+    ops_dir = memory_path("ops")
     if not ops_dir.exists():
         return None
     for day_dir in sorted(ops_dir.iterdir(), reverse=True):
+        if not day_dir.is_dir():
+            continue
         candidate = day_dir / f"{event_id}.json"
         if candidate.exists():
-            return json.loads(candidate.read_text(encoding="utf-8"))
+            try:
+                return json.loads(candidate.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                return None
     return None
