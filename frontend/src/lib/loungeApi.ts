@@ -44,12 +44,49 @@ export interface Envelope {
   halt_id?: string;
 }
 
+export interface PortfolioPerspective {
+  position?: string;
+  evidence_used?: string[];
+  assumptions?: string[];
+  risks?: string[];
+  recommendation?: string;
+  stop_condition?: string;
+  raw?: unknown;
+}
+
+export interface PortfolioDecision {
+  decision_id: string;
+  question: string;
+  proposal: string;
+  context?: Record<string, unknown> | string;
+  perspectives: Record<string, PortfolioPerspective>;
+  models?: Record<string, string>;
+  synthesis?: {
+    decision?: string;
+    reasoning?: string;
+    agreements?: string[];
+    disagreements?: string[];
+    smallest_test?: string;
+    stop_conditions?: string[];
+    owner_gate?: string | string[] | null;
+    financial_route?: string;
+    next_action?: string;
+  };
+  synthesis_model?: string;
+  ts: string;
+  status: string;
+  evidence_ref?: string;
+  _evidence_ref?: string;
+}
+
 export interface LoungeAvatarState {
   id: string;
   name: string;
   position: [number, number, number];
   model: string;
   state: string;
+  activity_summary?: string;
+  last_event_at?: string | null;
 }
 export interface LoungeState {
   lounge: string;
@@ -76,6 +113,9 @@ export const hemmes = {
 export const lounge = {
   state: () => fetchAPI<LoungeState>('/api/lounge/state'),
   scenes: (limit?: number) => fetchAPI<{ scenes: Envelope[] }>(`/api/lounge/scenes?limit=${limit ?? 20}`),
+};
+export const council = {
+  portfolioDeliberations: (limit?: number) => fetchAPI<{ deliberations: PortfolioDecision[]; count: number }>(`/api/council/portfolio/deliberations?limit=${limit ?? 20}`),
 };
 export const voice = {
   command: (transcript: string) => fetchAPI<Envelope>('/api/voice/command', {
