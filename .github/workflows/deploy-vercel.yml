@@ -40,10 +40,19 @@ jobs:
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     steps:
-      - name: Verify deployment credential is configured
+      - name: Report deployment authority on pull requests
+        if: ${{ github.event_name == 'pull_request' }}
         run: |
           if [ -z "$VERCEL_TOKEN" ]; then
-            echo 'VERCEL_TOKEN is not configured for this repository. Deployment remains human-gated until a token or Git connection is installed.'
+            echo '::warning::VERCEL_TOKEN is not configured. Source can be reviewed, but production deployment remains human-gated.'
+          else
+            echo 'Vercel deployment authority is configured. Token value is never printed.'
+          fi
+      - name: Fail closed without deployment authority on production events
+        if: ${{ github.event_name != 'pull_request' }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo 'VERCEL_TOKEN is not configured. Production deployment is blocked until a token or Git connection is installed.'
             exit 1
           fi
           echo 'Vercel deployment authority is configured. Token value is never printed.'
