@@ -12,7 +12,7 @@ Let the owner operate the fleet without living in a terminal, dashboard, or phon
 2. Classify sensitivity and risk before adding context.
 3. Route private/personal work to Pi.
 4. Route company/project/client/revenue work to Hermes.
-5. Route explicit music/operator interactions to TARS directly only when policy allows; otherwise delegate through Hermes.
+5. Route explicit music/operator/Trail Mixx interactions to BARS directly only when policy allows; otherwise delegate through Hermes.
 6. Surface Lightning alerts only when they meet the attention/interrupt policy.
 
 Jarvis must not become another orchestrator simply because it receives every request.
