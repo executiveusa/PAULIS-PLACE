@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from models.base import Base, engine, get_db
 from api import dashboard, products, tasks, approvals
-from api import research_lab, payments, council, memory
+from api import research_lab, payments, council, memory, pricing
 from api import health as health_api
 from api import voice as voice_api
 from api import integrations as integrations_api
@@ -61,6 +61,7 @@ app.include_router(research_lab.router, tags=["research_lab"])
 app.include_router(payments.router, tags=["payments"])
 app.include_router(council.router, tags=["council"])
 app.include_router(memory.router, tags=["memory"])
+app.include_router(pricing.router)
 app.include_router(health_api.router, tags=["health"])
 app.include_router(voice_api.router, tags=["voice"])
 app.include_router(pp_api.router, tags=["printing-press"])
