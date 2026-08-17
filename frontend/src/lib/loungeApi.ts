@@ -1,28 +1,24 @@
-// Pauli's World API helpers. Operational world state must come from real
-// backend events unless demo mode is explicitly enabled for a showcase build.
-import { demo, AVATAR_ROSTER } from './demo';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
-const DEMO_ENABLED = process.env.NEXT_PUBLIC_ENABLE_DEMO === 'true';
+// Pauli's World API helpers. This layer is truth-only: when the backend is unavailable,
+// callers receive an explicit error instead of synthetic activity.
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export async function fetchAPI<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...init,
-  });
-  if (!res.ok) {
-    throw new Error(`API ${res.status}: ${await res.text()}`);
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      ...init,
+    });
+  } catch (error) {
+    throw new Error(`Pauli backend unavailable for ${path}: ${error instanceof Error ? error.message : 'network error'}`);
   }
+  if (!res.ok) throw new Error(`Pauli API ${res.status} for ${path}: ${await res.text()}`);
   return res.json();
 }
 
-function withOptionalDemo<T>(real: () => Promise<T>, demoFn: () => T | Promise<T>): Promise<T> {
-  if (!DEMO_ENABLED) return real();
-  return real().catch(async () => await demoFn());
-}
-
 export interface HermesHealth {
-  status: 'ok' | 'cap_reached';
+  status: 'ok' | 'cap_reached' | 'offline';
   spent_usd: number;
   cap_usd: number;
   remaining_usd: number;
@@ -48,14 +44,50 @@ export interface Envelope {
   halt_id?: string;
 }
 
+export interface PortfolioPerspective {
+  position?: string;
+  evidence_used?: string[];
+  assumptions?: string[];
+  risks?: string[];
+  recommendation?: string;
+  stop_condition?: string;
+  raw?: unknown;
+}
+
+export interface PortfolioDecision {
+  decision_id: string;
+  question: string;
+  proposal: string;
+  context?: Record<string, unknown> | string;
+  perspectives: Record<string, PortfolioPerspective>;
+  models?: Record<string, string>;
+  synthesis?: {
+    decision?: string;
+    reasoning?: string;
+    agreements?: string[];
+    disagreements?: string[];
+    smallest_test?: string;
+    stop_conditions?: string[];
+    owner_gate?: string | string[] | null;
+    financial_route?: string;
+    next_action?: string;
+  };
+  synthesis_model?: string;
+  ts: string;
+  status: string;
+  evidence_ref?: string;
+  _evidence_ref?: string;
+}
+
 export interface LoungeAvatarState {
   id: string;
   name: string;
   position: [number, number, number];
   model: string;
   state: string;
+  activity_summary?: string;
+  last_event_at?: string | null;
 }
-
 export interface LoungeState {
   lounge: string;
   setting: string;
@@ -63,24 +95,31 @@ export interface LoungeState {
   schedule_cue: string;
 }
 
+export const AVATAR_ROSTER = [
+  { id: 'pauli', name: 'Pauli', role: 'Executive agent' },
+  { id: 'scout', name: 'Scout', role: 'Research' },
+  { id: 'strategist', name: 'Strategist', role: 'Strategy' },
+  { id: 'builder', name: 'Builder', role: 'Engineering' },
+  { id: 'critic', name: 'Critic', role: 'Gauntlet' },
+  { id: 'guardian', name: 'Guardian', role: 'Safety & policy' },
+  { id: 'publisher', name: 'Publisher', role: 'Deployment' },
+  { id: 'sales', name: 'Sales', role: 'Revenue' },
+] as const;
+
 export const hemmes = {
-  health: () => withOptionalDemo(() => fetchAPI<HermesHealth>('/api/hermes/health'), () => demo.health()),
-  envelopes: (limit?: number) =>
-    withOptionalDemo<{ envelopes: Envelope[] }>(() => fetchAPI<{ envelopes: Envelope[] }>(`/api/envelopes/recent?limit=${limit ?? 30}`), () => demo.envelopes(limit ?? 30)),
+  health: () => fetchAPI<HermesHealth>('/api/hermes/health'),
+  envelopes: (limit?: number) => fetchAPI<{ envelopes: Envelope[] }>(`/api/envelopes/recent?limit=${limit ?? 30}`),
 };
-
 export const lounge = {
-  state: () => withOptionalDemo<LoungeState>(() => fetchAPI<LoungeState>('/api/lounge/state'), () => demo.loungeState()),
-  scenes: (limit?: number) =>
-    withOptionalDemo<{ scenes: Envelope[] }>(() => fetchAPI<{ scenes: Envelope[] }>(`/api/lounge/scenes?limit=${limit ?? 20}`), () => demo.scenes(limit ?? 20)),
+  state: () => fetchAPI<LoungeState>('/api/lounge/state'),
+  scenes: (limit?: number) => fetchAPI<{ scenes: Envelope[] }>(`/api/lounge/scenes?limit=${limit ?? 20}`),
 };
-
+export const council = {
+  portfolioDeliberations: (limit?: number) => fetchAPI<{ deliberations: PortfolioDecision[]; count: number }>(`/api/council/portfolio/deliberations?limit=${limit ?? 20}`),
+};
 export const voice = {
-  command: (transcript: string) =>
-    withOptionalDemo<Envelope>(
-      () => fetchAPI<Envelope>('/api/voice/command', { method: 'POST', body: JSON.stringify({ transcript }) }),
-      () => demo.envelopes(1).then((r) => r.envelopes[0])
-    ),
+  command: (transcript: string) => fetchAPI<Envelope>('/api/voice/command', {
+    method: 'POST',
+    body: JSON.stringify({ transcript }),
+  }),
 };
-
-export { AVATAR_ROSTER, DEMO_ENABLED };

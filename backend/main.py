@@ -3,19 +3,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from models.base import Base, engine, get_db
 from api import dashboard, products, tasks, approvals
-from api import research_lab, payments, council, memory
+from api import research_lab, payments, council, memory, pricing
 from api import health as health_api
 from api import voice as voice_api
 from api import integrations as integrations_api
 from api import control_plane as control_plane_api
 from api import printing_press as pp_api
-from services import hermes as hermes_service
 from services import event_bus as event_bus_service
 from agents import council_adversarial, voice_router, sssf
-from services import zernio_service, ledger_service
+from services import zernio_service
 from workers.tasks import scan_all_trends, score_hot_trends, create_products_from_trends
 from workers.boot_task import boot_system
 import json
+import os
 from datetime import datetime, timezone
 from config import SETTINGS
 
@@ -32,20 +32,27 @@ try:
 except Exception as _e:
     print(f"[main] db.create_all skipped (dev ok): {type(_e).__name__}")
 
-app = FastAPI(
-    title="Pauli's Place API",
-    version="2.0.0",
-    description="Voice-first autonomous business OS control plane and factory runtime.",
-)
+app = FastAPI(title="Pauli's Place API", version="1.0.0")
 
-# CORS is configuration-driven rather than localhost-only.
-_origins = [origin.strip() for origin in SETTINGS.allowed_origins.split(",") if origin.strip()]
+# Exact-origin CORS. Additional origins can be supplied as a comma-separated
+# PAULI_ALLOWED_ORIGINS value. Never use '*' with credentialed requests.
+_default_origins = [
+    "http://localhost:3000",
+    "https://paulis-place.vercel.app",
+]
+_extra_origins = [
+    origin.strip().rstrip("/")
+    for origin in os.environ.get("PAULI_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+_allowed_origins = list(dict.fromkeys(_default_origins + _extra_origins))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_origins,
+    allow_origins=_allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Pauli-Approval", "X-Request-ID"],
 )
 
 # Routers
@@ -57,11 +64,13 @@ app.include_router(research_lab.router, tags=["research_lab"])
 app.include_router(payments.router, tags=["payments"])
 app.include_router(council.router, tags=["council"])
 app.include_router(memory.router, tags=["memory"])
+app.include_router(pricing.router)
 app.include_router(health_api.router, tags=["health"])
 app.include_router(voice_api.router, tags=["voice"])
 app.include_router(pp_api.router, tags=["printing-press"])
 app.include_router(integrations_api.router)
 app.include_router(control_plane_api.router)
+
 
 
 class ConnectionManager:
@@ -76,12 +85,6 @@ class ConnectionManager:
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
 
-    async def broadcast(self, message: dict):
-        for connection in list(self.active_connections):
-            try:
-                await connection.send_json(message)
-            except Exception:
-                pass
 
 
 manager = ConnectionManager()
@@ -89,6 +92,11 @@ manager = ConnectionManager()
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    origin = (websocket.headers.get("origin") or "").rstrip("/")
+    if origin and origin not in _allowed_origins:
+        await websocket.close(code=1008, reason="origin not allowed")
+        return
+
     await manager.connect(websocket)
     event_bus_service.register_websocket(websocket)
     try:
@@ -127,11 +135,12 @@ def trigger_product_creation(db: Session = Depends(get_db)):
 
 @app.get("/api/health")
 def health_check():
+    """Public liveness response. Never disclose infrastructure URLs or secrets."""
     return {
         "status": "healthy",
         "product": "Pauli's Place",
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "broker": "redis" if "redis" in SETTINGS.redis_url else "custom",
+        "event_bus": "configured",
     }
 
 

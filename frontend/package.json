@@ -1,6 +1,6 @@
 {
-  "name": "digifactory-dashboard",
-  "version": "0.1.0",
+  "name": "paulis-place-control",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -13,20 +13,27 @@
     "clsx": "^2.0.0",
     "framer-motion": "^10.16.0",
     "lucide-react": "^0.292.0",
-    "next": "14.0.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "next": "15.5.21",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "recharts": "^2.10.0",
     "three": "^0.180.0"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
-    "@types/react": "^18.3.31",
-    "@types/react-dom": "^18.3.1",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "@types/three": "^0.180.0",
     "autoprefixer": "^10.4.0",
-    "postcss": "^8.4.0",
+    "postcss": "8.5.23",
     "tailwindcss": "^3.3.0",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "nanoid": "5.1.16",
+    "sharp": "0.35.3",
+    "next": {
+      "postcss": "8.5.23"
+    }
   }
 }

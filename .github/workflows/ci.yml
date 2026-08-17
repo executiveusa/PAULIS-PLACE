@@ -41,6 +41,9 @@ jobs:
           pip install -r backend/requirements.txt
           pip install pytest
 
+      - name: Compile production runtime
+        run: python -m compileall -q backend/services/agent_runtime.py backend/workers/mission_control.py backend/workers/task_execution.py
+
       - name: Run tests
         run: python -m pytest backend/tests/ -q
         env:
@@ -59,10 +62,13 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Install
         run: npm install --legacy-peer-deps
+
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Build
         run: npm run build

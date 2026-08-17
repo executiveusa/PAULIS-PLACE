@@ -1,417 +1,122 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
-import { Brain, Cpu, DollarSign, Activity, Zap, MessageSquare, TrendingUp, Eye, Shield } from 'lucide-react';
-import { hemmes, Envelope } from '@/lib/loungeApi';
-import { demo } from '@/lib/demo';
-
-const API_URL = '';
-const WS_URL = typeof window !== 'undefined'
-  ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`
-  : 'ws://localhost:8000/ws';
-
-interface LogEntry {
-  timestamp: number;
-  task_type: string;
-  model: string;
-  tier: string;
-  cost: number;
-  input_tokens: number;
-  output_tokens: number;
-}
-
-interface CouncilDelib {
-  id: number;
-  topic: string;
-  status: string;
-  problem_statement: string;
-  ruling: string | null;
-  total_cost: number;
-  turns: number;
-  created_at: string;
-}
-
-interface AgentCard {
-  name: string;
-  model: string;
-  tier: string;
-  color: string;
-  active: boolean;
-}
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Activity, AlertTriangle, ArrowLeft, Cpu, Eye, Radio, ShieldCheck, Users } from 'lucide-react';
+import { getSession, pauliControl, PauliOverview } from '@/lib/pauliControl';
 
 export default function ObservationPage() {
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [councilDelibs, setCouncilDelibs] = useState<CouncilDelib[]>([]);
-  const [costs, setCosts] = useState<any>(null);
-  const [wsConnected, setWsConnected] = useState(false);
-  const [hermes, setHermes] = useState<HermesHealth | null>(null);
-  const [envelopes, setEnvelopes] = useState<Envelope[]>([]);
-  const [agents, setAgents] = useState<AgentCard[]>([
-    { name: 'GLM-5.2', model: 'Strategist', tier: 'strategist', color: 'cyan', active: false },
-    { name: 'DeepSeek', model: 'Workhorse', tier: 'workhorse', color: 'blue', active: false },
-    { name: 'Ornith-1', model: 'Critic', tier: 'critic', color: 'purple', active: false },
-    { name: 'Alpha-Owl', model: 'Evaluator', tier: 'critic', color: 'amber', active: false },
-    { name: 'GLM-4', model: 'Grunt', tier: 'grunt', color: 'gray', active: false },
-  ]);
-  const consoleRef = useRef<HTMLDivElement>(null);
+  const [overview, setOverview] = useState<PauliOverview | null>(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  // Hermes health + envelopes feed (the Yappyverse L1-L4 observability layer)
-  useEffect(() => {
-    const fetchHermes = async () => {
-      try { setHermes(await hemmes.health()); } catch {
-        try { setHermes(await demo.health()); } catch {}
-      }
-      try {
-        const r = await hemmes.envelopes(60);
-        setEnvelopes(r.envelopes || []);
-      } catch {
-        const r = await demo.envelopes(60);
-        setEnvelopes(r.envelopes || []);
-      }
-    };
-    fetchHermes();
-    const t = setInterval(fetchHermes, 4000);
-    return () => clearInterval(t);
-  }, []);
-
-  // Fetch logs periodically
-  useEffect(() => {
-    const fetchLogs = async () => {
-      let data: any = null;
-      try {
-        data = await fetch(`${API_URL}/api/research-lab/logs?limit=50`).then(r => r.json());
-      } catch { /* backend down */ }
-      if (!data?.logs) data = { logs: demo.logs(50) };
-      if (data.logs) {
-        setLogs(data.logs.slice(-50).reverse());
-        // Update agent active states
-        const recentModels = new Set(data.logs.slice(-10).map((l: LogEntry) => l.model));
-        setAgents(prev => prev.map(a => ({
-          ...a,
-          active: recentModels.has(a.name)
-        })));
-      }
-    };
-
-    const fetchCosts = async () => {
-      try {
-        const data = await fetch(`${API_URL}/api/research-lab/costs`).then(r => r.json());
-        setCosts(data);
-      } catch {
-        demo.costs().then(setCosts);
-      }
-    };
-
-    const fetchDelibs = async () => {
-      // Backend endpoint may not exist; demo council fills the arena
-      setCouncilDelibs(demo.councilDelibs());
-    };
-
-    fetchLogs();
-    fetchCosts();
-    fetchDelibs();
-    const interval = setInterval(() => {
-      fetchLogs();
-      fetchCosts();
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // WebSocket for real-time updates
-  useEffect(() => {
-    let ws: WebSocket | null = null;
-    let reconnect: NodeJS.Timeout | null = null;
-
-    const connect = () => {
-      ws = new WebSocket(WS_URL);
-      ws.onopen = () => setWsConnected(true);
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'log' || data.type === 'agent_activity') {
-            setLogs(prev => [...prev.slice(-49), data.payload]);
-          }
-        } catch (e) {}
-      };
-      ws.onclose = () => {
-        setWsConnected(false);
-        reconnect = setTimeout(connect, 3000);
-      };
-      ws.onerror = () => ws?.close();
-    };
-
-    connect();
-    return () => {
-      if (reconnect) clearTimeout(reconnect);
-      ws?.close();
-    };
-  }, []);
-
-  // Auto-scroll console
-  useEffect(() => {
-    if (consoleRef.current) {
-      consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
+  const refresh = useCallback(async () => {
+    try {
+      if (!getSession()) throw new Error('AUTH_REQUIRED');
+      setOverview(await pauliControl.overview());
+      setError('');
+    } catch (err) {
+      setError(String(err).includes('AUTH_REQUIRED') ? 'Owner authentication required. Return to Mission Control to sign in.' : (err instanceof Error ? err.message : 'Control plane unavailable'));
+    } finally {
+      setLoading(false);
     }
-  }, [logs]);
+  }, []);
 
-  const colorMap: Record<string, string> = {
-    cyan: 'border-cyan-400 shadow-cyan-400/30',
-    blue: 'border-blue-400 shadow-blue-400/30',
-    purple: 'border-purple-400 shadow-purple-400/30',
-    amber: 'border-amber-400 shadow-amber-400/30',
-    gray: 'border-gray-500 shadow-gray-500/20',
-  };
-
-  const activeColorMap: Record<string, string> = {
-    cyan: 'bg-cyan-400/10 border-cyan-400 shadow-cyan-400/50 animate-pulse',
-    blue: 'bg-blue-400/10 border-blue-400 shadow-blue-400/50 animate-pulse',
-    purple: 'bg-purple-400/10 border-purple-400 shadow-purple-400/50 animate-pulse',
-    amber: 'bg-amber-400/10 border-amber-400 shadow-amber-400/50 animate-pulse',
-    gray: 'bg-gray-500/10 border-gray-400 shadow-gray-400/30 animate-pulse',
-  };
+  useEffect(() => {
+    void refresh();
+    const timer = window.setInterval(refresh, 5000);
+    return () => window.clearInterval(timer);
+  }, [refresh]);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-3">
-            <Eye className="w-7 h-7 text-cyan-400" />
-            Observation Center
-          </h1>
-          <p className="text-gray-500 text-sm mt-1">Yappyverse L1–L4 enforcement + real-time agent telemetry</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className={`w-3 h-3 rounded-full ${wsConnected ? 'bg-green-400' : 'bg-red-400'} animate-pulse`} />
-          <span className="text-xs text-gray-400">{wsConnected ? 'LIVE' : 'RECONNECTING'}</span>
-        </div>
-      </div>
-
-      {/* Hermes hard-laws strip */}
-      {hermes && (
-        <div className="mb-6 grid grid-cols-12 gap-3">
-          <div className="col-span-3 rounded-lg border border-[#2A1F3D] bg-[#0A0714] p-3">
-            <div className="flex items-center gap-2 text-xs text-gray-500"><Shield className="w-4 h-4 text-[#C8AA32]"/>Hermes L1-L4</div>
-            <div className="mt-2 grid grid-cols-4 gap-1 text-[10px]">
-              {(['L1','L2','L3','L4'] as const).map((k) => (
-                <div key={k} className="px-2 py-1 rounded bg-[#1A1230] text-[#4DC99A] text-center">{k}:{hermes.laws[k]}</div>
-              ))}
+    <div className="min-h-screen bg-[#080808] text-stone-100 p-6 lg:p-8">
+      <div className="mx-auto max-w-7xl">
+        <header className="flex items-center justify-between gap-5 border-b border-white/10 pb-6">
+          <div className="flex items-center gap-4">
+            <Link href="/" className="border border-white/10 p-2 text-stone-500 hover:text-white" aria-label="Back"><ArrowLeft className="h-4 w-4" /></Link>
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.3em] text-amber-100/60">Truth surface</div>
+              <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold"><Eye className="h-5 w-5" /> Observation</h1>
+              <p className="mt-1 text-xs text-stone-500">Live missions, persistent agents, runtime providers, approvals, and incidents. No generated telemetry.</p>
             </div>
           </div>
-          <div className="col-span-3 rounded-lg border border-[#2A1F3D] bg-[#0A0714] p-3">
-            <div className="flex items-center gap-2 text-xs text-gray-500"><DollarSign className="w-4 h-4 text-green-400"/>Daily cap</div>
-            <div className="text-2xl mt-1 font-bold text-green-400">${hermes.spent_usd.toFixed(2)} / ${hermes.cap_usd.toFixed(2)}</div>
-            <div className="h-1.5 mt-2 bg-gray-800 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-green-400 to-amber-400" style={{width: `${Math.min(100, (hermes.spent_usd / hermes.cap_usd) * 100)}%`}}/>
-            </div>
-          </div>
-          <div className="col-span-6 rounded-lg border border-[#2A1F3D] bg-[#0A0714] p-3 max-h-[200px] overflow-y-auto">
-            <div className="flex items-center justify-between text-xs text-gray-500">
-              <span className="flex items-center gap-2"><Zap className="w-3 h-3 text-[#FF6432]"/>Recent envelopes</span>
-              <span>{envelopes.length}</span>
-            </div>
-            <ul className="mt-2 space-y-1 text-[11px] font-mono">
-              {envelopes.slice(0, 12).map((e, i) => (
-                <li key={e.event_id + i} className="text-gray-300">
-                  <span className="text-[#C8AA32]">{e.route}</span>
-                  <span className="text-gray-600"> · {e.stage}</span>
-                  <span className="text-gray-500"> · {e.judge_verdict ?? '—'}</span>
-                  {e.halt && <span className="ml-2 text-[#E05A5A]">HALT</span>}
-                </li>
-              ))}
-              {envelopes.length === 0 && <li className="text-gray-600">no events yet</li>}
-            </ul>
-          </div>
-        </div>
-      )}
+          <button onClick={() => void refresh()} className="border border-white/10 px-4 py-2 text-xs text-stone-300 hover:border-amber-100/30">Refresh</button>
+        </header>
 
-      <div className="grid grid-cols-12 gap-4 h-[calc(100vh-140px)]">
-        {/* Stage Left: Agent Roster */}
-        <div className="col-span-3 space-y-3 overflow-auto">
-          <h2 className="text-xs uppercase tracking-wider text-gray-500 mb-2">Agent Roster</h2>
-          {agents.map((agent) => (
-            <div
-              key={agent.name}
-              className={`rounded-lg border p-4 transition-all duration-300 ${
-                agent.active ? activeColorMap[agent.color] : `bg-gray-900/50 ${colorMap[agent.color]}`
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-bold text-sm">{agent.name}</div>
-                  <div className="text-xs text-gray-500">{agent.model}</div>
-                </div>
-                <Cpu className={`w-5 h-5 ${agent.active ? 'animate-spin' : ''} text-gray-600`} />
-              </div>
-              {agent.active && (
-                <div className="mt-2 text-xs text-cyan-400 flex items-center gap-1">
-                  <Activity className="w-3 h-3" />
-                  Thinking...
-                </div>
-              )}
-            </div>
-          ))}
+        {error && <div className="mt-6 border border-red-400/20 bg-red-950/10 p-4 text-sm text-red-200">{error}</div>}
 
-          {/* Council indicator */}
-          <div className="mt-6 rounded-lg border border-purple-500/30 bg-purple-500/5 p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Brain className="w-4 h-4 text-purple-400" />
-              <span className="text-xs font-bold uppercase tracking-wider text-purple-400">The Council</span>
-            </div>
-            <div className="text-xs text-gray-500">
-              {councilDelibs.filter(d => d.status === 'deliberating').length > 0
-                ? 'DELIBERATING...'
-                : 'Standing by'}
-            </div>
-          </div>
-        </div>
+        <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Metric label="Active missions" value={overview?.active_missions ?? 0} icon={Activity} />
+          <Metric label="Agents working" value={overview?.agents_working ?? 0} icon={Users} />
+          <Metric label="Approvals pending" value={overview?.approvals_pending ?? 0} icon={ShieldCheck} />
+          <Metric label="Open incidents" value={overview?.open_incidents ?? 0} icon={AlertTriangle} />
+        </section>
 
-        {/* Center Stage: Terminal */}
-        <div className="col-span-6 flex flex-col">
-          <h2 className="text-xs uppercase tracking-wider text-gray-500 mb-2">Agent Terminal</h2>
-          <div
-            ref={consoleRef}
-            className="flex-1 bg-black/60 rounded-lg border border-gray-800 p-4 overflow-auto font-mono text-xs"
-          >
-            {logs.length === 0 ? (
-              <div className="text-gray-600 text-center mt-20">
-                Awaiting agent activity...
-              </div>
-            ) : (
-              logs.map((log, i) => (
-                <div key={i} className="mb-1 leading-relaxed">
-                  <span className="text-gray-600">
-                    [{new Date(log.timestamp * 1000).toLocaleTimeString()}]
-                  </span>{' '}
-                  <span className={tierColor(log.tier)}>
-                    [{log.model}]
-                  </span>{' '}
-                  <span className="text-gray-300">{log.task_type}</span>{' '}
-                  <span className="text-gray-600">
-                    {log.input_tokens}+{log.output_tokens} tok
-                  </span>{' '}
-                  <span className="text-green-500">
-                    ${log.cost.toFixed(5)}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Stage Right: Telemetry */}
-        <div className="col-span-3 space-y-4 overflow-auto">
-          <h2 className="text-xs uppercase tracking-wider text-gray-500 mb-2">Telemetry</h2>
-
-          {/* Cost card */}
-          <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <DollarSign className="w-4 h-4 text-green-400" />
-              <span className="text-xs font-bold uppercase tracking-wider">API Spend</span>
-            </div>
-            <div className="text-3xl font-bold text-green-400">
-              ${costs?.total_cost?.toFixed(4) || '0.0000'}
-            </div>
-            <div className="text-xs text-gray-500 mt-1">
-              {costs?.call_count || 0} calls | avg ${(costs?.avg_cost_per_call || 0).toFixed(5)}
-            </div>
-          </div>
-
-          {/* Model breakdown */}
-          <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <TrendingUp className="w-4 h-4 text-cyan-400" />
-              <span className="text-xs font-bold uppercase tracking-wider">By Model</span>
-            </div>
-            <div className="space-y-2">
-              {Object.entries(costs?.by_model || {}).map(([model, cost]: [string, any]) => (
-                cost > 0 && (
-                  <div key={model} className="flex justify-between text-xs">
-                    <span className="text-gray-400">{model}</span>
-                    <span className="text-green-400">${cost.toFixed(4)}</span>
+        <section className="mt-8 grid gap-8 xl:grid-cols-2">
+          <div>
+            <SectionTitle title="Persistent agents" subtitle="Identity is stable; models and compute are provider choices." />
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {(overview?.agents ?? []).map((agent) => (
+                <div key={agent.id} className="border border-white/10 bg-[#0e0e0e] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div><div className="text-sm font-medium">{agent.name}</div><div className="text-xs text-stone-500">{agent.role}{agent.specialty ? ` · ${agent.specialty}` : ''}</div></div>
+                    <Status status={agent.status} />
                   </div>
-                )
+                  <div className="mt-4 flex items-center justify-between text-[10px] uppercase tracking-wider text-stone-600"><span>{agent.world_location_key || 'no world location'}</span><span>{agent.last_heartbeat_at ? new Date(agent.last_heartbeat_at).toLocaleTimeString() : 'no heartbeat'}</span></div>
+                </div>
               ))}
-              {Object.values(costs?.by_model || {}).every((c: any) => c === 0) && (
-                <div className="text-xs text-gray-600">No spend yet</div>
-              )}
+              {!loading && !overview?.agents?.length && <Empty label="No agents registered." />}
             </div>
           </div>
 
-          {/* Daily limit */}
-          <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Zap className="w-4 h-4 text-amber-400" />
-              <span className="text-xs font-bold uppercase tracking-wider">Daily Limit</span>
-            </div>
-            <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-green-400 to-amber-400"
-                style={{ width: `${Math.min(100, ((costs?.total_cost || 0) / 5) * 100)}%` }}
-              />
-            </div>
-            <div className="text-xs text-gray-500 mt-2">
-              ${(costs?.total_cost || 0).toFixed(2)} / $5.00
+          <div>
+            <SectionTitle title="Runtime providers" subtitle="Unavailable providers remain visible rather than silently falling back." />
+            <div className="mt-3 space-y-2">
+              {(overview?.providers ?? []).map((provider) => (
+                <div key={provider.provider_key} className="flex items-center justify-between gap-4 border border-white/10 bg-[#0e0e0e] p-4">
+                  <div className="flex items-center gap-3"><Cpu className="h-4 w-4 text-stone-500" /><div><div className="text-sm font-medium">{provider.name}</div><div className="text-xs text-stone-500">{provider.kind} · {provider.provider_key}</div></div></div>
+                  <Status status={provider.health_status} />
+                </div>
+              ))}
+              {!loading && !overview?.providers?.length && <Empty label="No providers registered." />}
             </div>
           </div>
-        </div>
+        </section>
+
+        <section className="mt-8 grid gap-8 xl:grid-cols-[1.3fr_.7fr]">
+          <div>
+            <SectionTitle title="Mission stream" subtitle="Current durable outcomes and state transitions." />
+            <div className="mt-3 divide-y divide-white/10 border border-white/10 bg-[#0e0e0e]">
+              {(overview?.missions ?? []).map((mission) => (
+                <div key={mission.id} className="flex items-center justify-between gap-5 p-4">
+                  <div className="min-w-0"><div className="truncate text-sm font-medium">{mission.title}</div><div className="mt-1 line-clamp-1 text-xs text-stone-500">{mission.requested_outcome}</div></div>
+                  <Status status={mission.status} />
+                </div>
+              ))}
+              {!loading && !overview?.missions?.length && <Empty label="No active missions." />}
+            </div>
+          </div>
+
+          <div>
+            <SectionTitle title="Incident stream" subtitle="Operational blockers and recovery state." />
+            <div className="mt-3 space-y-2">
+              {(overview?.incidents ?? []).map((incident) => (
+                <div key={incident.id} className="border border-red-400/20 bg-red-950/10 p-4">
+                  <div className="flex items-center justify-between"><span className="text-[10px] uppercase tracking-wider text-red-300">{incident.severity}</span><Status status={incident.status} /></div>
+                  <div className="mt-2 text-sm font-medium">{incident.title}</div>
+                  <p className="mt-1 text-xs leading-5 text-stone-500">{incident.summary}</p>
+                </div>
+              ))}
+              {!loading && !overview?.incidents?.length && <div className="flex items-center gap-2 border border-emerald-400/15 bg-emerald-950/10 p-4 text-xs text-emerald-300"><Radio className="h-3.5 w-3.5" /> No open incidents.</div>}
+            </div>
+          </div>
+        </section>
       </div>
-
-      {/* Lower Stage: The Council Arena */}
-      <CouncilArena delibs={councilDelibs} />
     </div>
   );
 }
 
-function CouncilArena({ delibs }: { delibs: CouncilDelib[] }) {
-  return (
-    <div className="mt-4 rounded-lg border border-purple-500/20 bg-purple-500/5 p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <MessageSquare className="w-4 h-4 text-purple-400" />
-        <span className="text-xs font-bold uppercase tracking-wider text-purple-400">Council Arena</span>
-        <span className="text-xs text-gray-500 ml-auto">
-          {delibs.length} deliberations on record
-        </span>
-      </div>
-      {delibs.length === 0 ? (
-        <div className="text-xs text-gray-600 text-center py-4">
-          The Council stands in recess. No complex problems require debate.
-        </div>
-      ) : (
-        <div className="space-y-2 max-h-32 overflow-auto">
-          {delibs.slice(0, 5).map((d) => (
-            <div key={d.id} className="flex items-center gap-3 text-xs">
-              <span className={`w-2 h-2 rounded-full ${
-                d.status === 'decided' ? 'bg-green-400' :
-                d.status === 'deliberating' ? 'bg-amber-400 animate-pulse' :
-                'bg-red-400'
-              }`} />
-              <span className="text-gray-400">#{d.id}</span>
-              <span className="text-gray-300">{d.topic}</span>
-              <span className="text-gray-600 ml-auto">${d.total_cost.toFixed(4)}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function tierColor(tier: string): string {
-  const map: Record<string, string> = {
-    strategist: 'text-cyan-400',
-    workhorse: 'text-blue-400',
-    critic: 'text-purple-400',
-    grunt: 'text-gray-400',
-  };
-  return map[tier] || 'text-gray-400';
-}
-
-interface HermesHealth {
-  status: 'ok' | 'cap_reached';
-  spent_usd: number;
-  cap_usd: number;
-  remaining_usd: number;
-  routes_known: number;
-  laws: { L1: string; L2: string; L3: string; L4: string };
-}
+function Metric({ label, value, icon: Icon }: { label: string; value: number | string; icon: any }) { return <div className="border border-white/10 bg-[#0e0e0e] p-4"><Icon className="h-4 w-4 text-amber-100/60" /><div className="mt-5 text-2xl font-semibold">{value}</div><div className="mt-1 text-[10px] uppercase tracking-[0.18em] text-stone-500">{label}</div></div>; }
+function SectionTitle({ title, subtitle }: { title: string; subtitle: string }) { return <div><h2 className="text-base font-medium">{title}</h2><p className="mt-1 text-xs text-stone-500">{subtitle}</p></div>; }
+function Empty({ label }: { label: string }) { return <div className="border border-white/10 p-4 text-sm text-stone-600">{label}</div>; }
+function Status({ status }: { status: string }) { const value = String(status || 'unknown').toLowerCase(); const good = ['ready','healthy','working','active','executing','verified','deployed','resolved'].some((item) => value.includes(item)); const bad = ['failed','error','blocked','critical','offline'].some((item) => value.includes(item)); const style = bad ? 'border-red-400/20 text-red-300' : good ? 'border-emerald-400/20 text-emerald-300' : 'border-white/10 text-stone-400'; return <span className={`border px-2 py-1 text-[10px] uppercase tracking-wider ${style}`}>{status || 'unknown'}</span>; }

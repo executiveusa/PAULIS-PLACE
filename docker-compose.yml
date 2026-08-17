@@ -1,26 +1,24 @@
-version: '3.8'
-
 services:
+  # Optional local-development database. Production uses DATABASE_URL from .env,
+  # which should point at the canonical Supabase/Postgres control plane.
   db:
     image: postgres:15-alpine
+    profiles: ["local"]
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:-pauli}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pauli_local_only}
+      POSTGRES_DB: ${POSTGRES_DB:-pauli}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pauli}"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    restart: unless-stopped
     volumes:
       - redis_data:/data
     healthcheck:
@@ -31,72 +29,55 @@ services:
 
   backend:
     build: ./backend
+    restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "8000:8000"
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=${REDIS_URL}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN}
-      - PRINTIFY_SHOP_ID=${PRINTIFY_SHOP_ID}
-      - PRINTIFY_TOKEN=${PRINTIFY_TOKEN}
-      - ETSY_API_KEY=${ETSY_API_KEY}
-      - ETSY_SECRET=${ETSY_SECRET}
-      - ETSY_ACCESS_TOKEN=${ETSY_ACCESS_TOKEN}
-      - ETSY_REFRESH_TOKEN=${ETSY_REFRESH_TOKEN}
-      - FIVERR_ACCESS_TOKEN=${FIVERR_ACCESS_TOKEN}
-      - SECRET_KEY=${SECRET_KEY}
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_healthy
     volumes:
-      - ./backend:/app
       - generated_assets:/app/generated
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)"]
+      interval: 30s
+      timeout: 8s
+      retries: 3
 
   celery-worker:
     build: ./backend
+    restart: unless-stopped
     command: celery -A workers.celery_app worker -l info -c 4
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=${REDIS_URL}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN}
-      - PRINTIFY_SHOP_ID=${PRINTIFY_SHOP_ID}
-      - PRINTIFY_TOKEN=${PRINTIFY_TOKEN}
-      - ETSY_API_KEY=${ETSY_API_KEY}
-      - ETSY_SECRET=${ETSY_SECRET}
-      - ETSY_ACCESS_TOKEN=${ETSY_ACCESS_TOKEN}
-      - ETSY_REFRESH_TOKEN=${ETSY_REFRESH_TOKEN}
-      - SECRET_KEY=${SECRET_KEY}
+    env_file:
+      - .env
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./backend:/app
-      - generated_assets:/app/generated
 
   celery-beat:
     build: ./backend
+    restart: unless-stopped
     command: celery -A workers.celery_app beat -l info
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=${REDIS_URL}
+    env_file:
+      - .env
     depends_on:
       redis:
         condition: service_healthy
+      celery-worker:
+        condition: service_started
 
+  # Optional local UI. Production frontend is deployed by Vercel.
   frontend:
     build: ./frontend
+    profiles: ["local"]
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   postgres_data:

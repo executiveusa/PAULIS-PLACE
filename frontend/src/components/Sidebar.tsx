@@ -3,33 +3,31 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Home,
-  ListChecks,
-  Users,
-  Map,
-  PlugZap,
-  Factory,
+  Activity,
+  Banknote,
   Brain,
-  Eye,
+  Building2,
+  Factory,
+  MessageCircle,
+  PlugZap,
+  Radio,
   Settings,
   ShieldCheck,
-  Radio,
+  Sparkles,
+  Users,
 } from 'lucide-react';
 import clsx from 'clsx';
 
-const primary = [
-  { href: '/', label: 'Today', icon: Home },
-  { href: '/missions', label: 'Missions', icon: ListChecks },
-  { href: '/agents', label: 'Agents', icon: Users },
-  { href: '/lounge', label: "Pauli's World", icon: Map },
-  { href: '/integrations', label: 'Connections', icon: PlugZap },
-];
-
-const factory = [
-  { href: '/products', label: 'Factory', icon: Factory },
-  { href: '/research', label: 'Research', icon: Brain },
-  { href: '/observation', label: 'Observation', icon: Eye },
+const navItems = [
+  { href: '/', label: 'Talk', icon: MessageCircle },
+  { href: '/', label: 'Today', icon: Activity },
+  { href: '/observation', label: 'Agents', icon: Users },
+  { href: '/products', label: 'Businesses', icon: Building2 },
+  { href: '/research', label: 'Factory', icon: Factory },
   { href: '/queue', label: 'Approvals', icon: ShieldCheck },
+  { href: '/trends', label: 'Signal', icon: Brain },
+  { href: '/lounge', label: 'World', icon: Radio },
+  { href: '/integrations', label: 'Integrations', icon: PlugZap },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -37,43 +35,47 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <>
-      <aside className="hidden md:flex fixed inset-y-0 left-0 z-40 w-[248px] flex-col border-r border-white/[0.07] bg-[#0a0a09]/95 backdrop-blur-xl">
-        <Link href="/" className="px-5 pt-6 pb-5 border-b border-white/[0.06] group">
-          <div className="flex items-center gap-3">
-            <div className="relative h-10 w-10 rounded-full border border-white/15 bg-stone-100 text-stone-950 grid place-items-center font-black tracking-tight shadow-[0_0_30px_rgba(255,255,255,.08)]">
-              P
-              <span className="absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full bg-[#79c493] border-2 border-[#0a0a09]" />
-            </div>
-            <div>
-              <h1 className="font-semibold tracking-tight text-[15px] group-hover:text-white">Pauli's Place</h1>
-              <p className="text-[10px] uppercase tracking-[0.18em] text-stone-600 mt-0.5">The house is working</p>
-            </div>
+    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-white/10 bg-[#0b0b0b] lg:flex">
+      <div className="border-b border-white/10 p-6">
+        <Link href="/" className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-amber-200/25 bg-amber-100/[0.03]">
+            <Sparkles className="h-4 w-4 text-amber-100/80" />
+          </div>
+          <div>
+            <h1 className="font-semibold tracking-tight">Pauli's Place</h1>
+            <p className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-stone-600">Mission Control</p>
           </div>
         </Link>
+      </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-4 scrollbar-thin">
-          <div className="eyebrow px-3 mb-2">Control</div>
-          <div className="space-y-1">
-            {primary.map((item) => <NavItem key={item.href} item={item} pathname={pathname} />)}
-          </div>
+      <nav className="flex-1 space-y-1 p-3">
+        {navItems.map((item, index) => {
+          const isActive = pathname === item.href && (item.href !== '/' || index === 0);
+          return (
+            <Link
+              key={`${item.href}-${item.label}`}
+              href={item.href}
+              className={clsx(
+                'flex items-center gap-3 px-4 py-3 text-sm transition-colors',
+                isActive
+                  ? 'bg-white/[0.05] text-stone-100'
+                  : 'text-stone-500 hover:bg-white/[0.03] hover:text-stone-200'
+              )}
+            >
+              <item.icon className="h-4 w-4" />
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
 
-          <div className="eyebrow px-3 mt-7 mb-2">Under the hood</div>
-          <div className="space-y-1">
-            {factory.map((item) => <NavItem key={item.href} item={item} pathname={pathname} />)}
+      <div className="border-t border-white/10 p-4">
+        <div className="border border-white/10 bg-black/20 p-4">
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-stone-600">
+            <Banknote className="h-3.5 w-3.5" />
+            Treasury policy
           </div>
-        </nav>
-
-        <div className="p-4 border-t border-white/[0.06]">
-          <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-3.5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-xs text-stone-400">
-                <Radio className="w-3.5 h-3.5" /> House status
-              </div>
-              <span className="status-dot status-live" />
-            </div>
-            <div className="text-xs text-stone-600 mt-2 leading-relaxed">Voice, missions, agents and tools share one control plane.</div>
-          </div>
+          <p className="mt-3 text-xs leading-5 text-stone-400">Routine reversible work can run autonomously. Consequential actions remain scoped and approval-gated.</p>
         </div>
       </aside>
 
@@ -92,19 +94,5 @@ export function Sidebar() {
         </div>
       </nav>
     </>
-  );
-}
-
-function NavItem({ item, pathname }: { item: { href: string; label: string; icon: any }; pathname: string }) {
-  const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
-  return (
-    <Link href={item.href}
-      className={clsx(
-        'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] transition',
-        active ? 'bg-stone-100 text-stone-950 font-semibold shadow-sm' : 'text-stone-500 hover:text-stone-100 hover:bg-white/[0.045]'
-      )}>
-      <item.icon className={clsx('w-4 h-4 shrink-0', active ? 'text-stone-950' : 'text-stone-600 group-hover:text-stone-300')} />
-      <span>{item.label}</span>
-    </Link>
   );
 }
