@@ -26,6 +26,19 @@ async function fetchJSON<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  controlPlane: {
+    status: () => fetchJSON<ControlPlaneStatus>('/api/control-plane/status'),
+    agents: (organizationSlug = 'paulis-place') =>
+      fetchJSON<AgentListResponse>(`/api/control-plane/agents?organization_slug=${encodeURIComponent(organizationSlug)}`),
+    missions: (organizationSlug = 'paulis-place', limit = 30) =>
+      fetchJSON<MissionListResponse>(`/api/control-plane/missions?organization_slug=${encodeURIComponent(organizationSlug)}&limit=${limit}`),
+    createMission: (payload: MissionCreateRequest) =>
+      fetchJSON<MissionCreateResponse>('/api/control-plane/missions', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    agentForgeStatus: () => fetchJSON<AgentForgeStatus>('/api/control-plane/providers/agentforge'),
+  },
   dashboard: {
     getStats: () => fetchJSON<DashboardStats>('/api/dashboard/stats'),
     getRevenueChart: (days = 30) => fetchJSON<RevenueData[]>(`/api/dashboard/revenue-chart?days=${days}`),
@@ -74,6 +87,94 @@ export const api = {
     createProducts: () => fetchJSON<{ status: string }>('/api/trigger/create-products', { method: 'POST' }),
   },
 };
+
+export interface ProviderHealth {
+  provider?: string;
+  configured?: boolean;
+  installed?: boolean;
+  status: string;
+  capabilities?: string[] | readonly string[];
+  detail?: string | null;
+  [key: string]: unknown;
+}
+
+export interface ControlPlaneStatus {
+  product: string;
+  status: string;
+  timestamp: string;
+  database: { schema: string; ready: boolean; error?: string };
+  providers: { agentforge: ProviderHealth; composio: ProviderHealth };
+  counts: { organizations: number; agents: number; missions: number; approvals_pending: number };
+}
+
+export interface PauliAgent {
+  id: string;
+  agent_key: string;
+  name: string;
+  role: string;
+  specialty?: string | null;
+  status: string;
+  world_location_key?: string | null;
+  last_heartbeat_at?: string | null;
+  skill_manifest?: unknown[];
+  model_policy?: Record<string, unknown>;
+  runtime_policy?: Record<string, unknown>;
+}
+
+export interface AgentListResponse {
+  organization_slug: string;
+  agents: PauliAgent[];
+  status: string;
+}
+
+export interface Mission {
+  id: string;
+  title: string;
+  intent_original: string;
+  requested_outcome: string;
+  language: 'en' | 'es-MX' | 'mixed';
+  mission_type?: string | null;
+  required_completion_level: string;
+  status: string;
+  priority: number;
+  autonomous_budget_cents: number;
+  spent_cents: number;
+  attempt_count: number;
+  created_at: string;
+  updated_at: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+}
+
+export interface MissionListResponse {
+  organization_slug: string;
+  missions: Mission[];
+  status: string;
+}
+
+export interface MissionCreateRequest {
+  title: string;
+  intent: string;
+  requested_outcome: string;
+  language?: 'en' | 'es-MX' | 'mixed';
+  mission_type?: string;
+  required_completion_level?: string;
+  autonomous_budget_cents?: number;
+  organization_slug?: string;
+}
+
+export interface MissionCreateResponse {
+  mission_id: string;
+  correlation_id: string;
+  status: string;
+  title: string;
+  requested_outcome: string;
+}
+
+export interface AgentForgeStatus extends ProviderHealth {
+  python?: string;
+  project_dir?: string;
+}
 
 export interface DashboardStats {
   products: { total: number; published: number; pending_approval: number; drafts: number };

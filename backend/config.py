@@ -7,6 +7,8 @@ from functools import lru_cache
 class Settings(BaseSettings):
     # Database
     database_url: str = "postgresql://digifactory:changeme@localhost:5432/digifactory"
+    pauli_db_schema: str = "pauli"
+    pauli_default_org_slug: str = "paulis-place"
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"
@@ -31,6 +33,13 @@ class Settings(BaseSettings):
     omniroute_base_url: str = ""
     litellm_base_url: str = ""
     litellm_master_key: str = ""
+
+    # AgentForge runtime provider. AgentForge remains a separately installed
+    # runtime process so Pauli is not coupled to one agent framework.
+    agentforge_enabled: bool = True
+    agentforge_python: str = "python"
+    agentforge_project_dir: str = ".agentforge"
+    agentforge_timeout_seconds: int = 300
 
     # Yappyverse hard laws
     yappy_daily_spend_cap_usd: float = 25.0
@@ -81,6 +90,12 @@ class Settings(BaseSettings):
     next_public_lounge_ws_url: str = "ws://localhost:8000/ws"
     readyplayerme_token: str = ""
 
+    # Voice / telephony
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_from_number: str = ""
+    openai_realtime_model: str = "gpt-realtime"
+
     # Vercel
     vercel_api_key: str = ""
     vercel_token: str = ""
@@ -123,13 +138,13 @@ class Settings(BaseSettings):
     auto_approve_design: bool = False
     auto_approve_listing: bool = False
     auto_publish: bool = False
-    max_daily_spend: float = 25.0  # raised for finish run per human
+    max_daily_spend: float = 25.0
 
     # Research settings
     max_research_iterations: int = 3
     max_searches_per_research: int = 15
 
-    # Cost guards (more aggressive)
+    # Cost guards
     max_cost_per_idea: float = 0.10
     max_cost_per_product: float = 0.25
 

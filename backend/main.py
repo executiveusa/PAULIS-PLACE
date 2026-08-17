@@ -7,6 +7,7 @@ from api import research_lab, payments, council, memory, pricing
 from api import health as health_api
 from api import voice as voice_api
 from api import integrations as integrations_api
+from api import control_plane as control_plane_api
 from api import printing_press as pp_api
 from services import event_bus as event_bus_service
 from agents import council_adversarial, voice_router, sssf
@@ -16,6 +17,7 @@ from workers.boot_task import boot_system
 import json
 import os
 from datetime import datetime, timezone
+from config import SETTINGS
 
 # Wire Yappyverse event subscribers at import time (idempotent)
 council_adversarial.register()
@@ -23,7 +25,8 @@ voice_router.register()
 sssf.register_subscribers()
 zernio_service.register()
 
-# Create tables (best-effort: skip if DB unreachable in dev)
+# Create legacy SQLAlchemy tables (best-effort for local dev). The canonical
+# Pauli control plane is migrated separately in the `pauli` Supabase schema.
 try:
     Base.metadata.create_all(bind=engine)
 except Exception as _e:
@@ -66,6 +69,8 @@ app.include_router(health_api.router, tags=["health"])
 app.include_router(voice_api.router, tags=["voice"])
 app.include_router(pp_api.router, tags=["printing-press"])
 app.include_router(integrations_api.router)
+app.include_router(control_plane_api.router)
+
 
 
 class ConnectionManager:
@@ -79,6 +84,7 @@ class ConnectionManager:
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
+
 
 
 manager = ConnectionManager()
@@ -132,6 +138,7 @@ def health_check():
     """Public liveness response. Never disclose infrastructure URLs or secrets."""
     return {
         "status": "healthy",
+        "product": "Pauli's Place",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "event_bus": "configured",
     }

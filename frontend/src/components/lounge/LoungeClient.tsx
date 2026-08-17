@@ -125,8 +125,32 @@ export default function LoungeClient() {
       setSpeaker(target);
       window.setTimeout(() => setSpeaker(null), 3500);
     }
+    loungeApi.scenes(16).then(r => setScenes(r.scenes)).catch(() => {});
   };
 
+  useEffect(() => {
+    load();
+    const poll = setInterval(load, 15000);
+    const wsUrl = process.env.NEXT_PUBLIC_LOUNGE_WS_URL || process.env.NEXT_PUBLIC_WS_URL;
+    let ws: WebSocket | undefined;
+    if (wsUrl) {
+      try {
+        ws = new WebSocket(wsUrl);
+        ws.onmessage = (message) => {
+          try {
+            const data = JSON.parse(message.data);
+            if (data?.type === 'event' && data.envelope) {
+              setScenes(prev => [data.envelope, ...prev].slice(0, 16));
+              setBackendStatus('live');
+            }
+          } catch {}
+        };
+      } catch {}
+    }
+    return () => { clearInterval(poll); ws?.close(); };
+  }, []);
+
+  const onAccept = (env: Envelope) => setScenes(prev => [env, ...prev].slice(0, 16));
   const { listening, transcript, error, lastResponse, start, stop } = useVoiceCommand({ onAccept });
   const activeError = error || (mode === 'agents' ? worldError : mode === 'portfolio' ? portfolioError : councilError);
 

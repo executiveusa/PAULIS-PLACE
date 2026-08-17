@@ -77,7 +77,22 @@ export function Sidebar() {
           </div>
           <p className="mt-3 text-xs leading-5 text-stone-400">Routine reversible work can run autonomously. Consequential actions remain scoped and approval-gated.</p>
         </div>
-      </div>
-    </aside>
+      </aside>
+
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 border-t border-white/10 bg-[#090908]/95 backdrop-blur-2xl px-2 pb-[max(.45rem,env(safe-area-inset-bottom))] pt-1.5">
+        <div className="grid grid-cols-5 gap-1">
+          {primary.map((item) => {
+            const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
+            return (
+              <Link key={item.href} href={item.href}
+                className={clsx('min-w-0 rounded-xl py-2 flex flex-col items-center gap-1 text-[9px] font-medium transition', active ? 'text-stone-100 bg-white/[0.07]' : 'text-stone-600')}>
+                <item.icon className="w-[18px] h-[18px]" />
+                <span className="truncate max-w-full">{item.label === "Pauli's World" ? 'World' : item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+    </>
   );
 }
