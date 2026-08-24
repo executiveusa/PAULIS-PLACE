@@ -59,3 +59,21 @@ risks:
   - pgvector extension optional (keyword search fallback works)
 next_action: Human provides API keys in .env, runs `bash scripts/boot_sequence.sh`
 human_needed: true
+
+## bead-0003
+id: bead-0003
+timestamp: 2026-08-24T08:15:00Z
+actor: GPT-5.6 Sol (Production Readiness)
+phase: Production Baseline / Dependency Security
+repo: executiveusa/PAULIS-PLACE
+branch: feat/system-production-baseline-001
+files_changed:
+  - backend/requirements.txt
+  - beads/BEADS_PROTOCOL.md
+decision: Upgrade lxml, python-multipart, and Pillow to current Dependabot-vetted security versions; validate through existing backend pytest and frontend production build CI before merge.
+reason: Remove known dependency security debt before deeper world/backend production integration.
+rollback_command: git revert <slice-merge-sha>
+risks:
+  - Major-version dependency changes may reveal compatibility issues in CI.
+next_action: Run PR CI, inspect failures and review comments, repair until green, then request human approval to merge.
+human_needed: true
