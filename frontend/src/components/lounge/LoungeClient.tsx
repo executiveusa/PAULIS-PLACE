@@ -2,8 +2,9 @@
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Radio, WifiOff } from 'lucide-react';
+import type { PauliAgent } from '@/lib/api';
 import { council as councilApi, lounge as loungeApi, Envelope, LoungeState, PortfolioDecision, AVATAR_ROSTER } from '@/lib/loungeApi';
 import { fetchPauliverseSnapshot, PauliverseSnapshot } from '@/lib/pauliverseApi';
 import { useVoiceCommand } from './useVoiceCommand';
@@ -128,6 +129,17 @@ export default function LoungeClient() {
     loungeApi.scenes(16).then((result) => setScenes(result.scenes)).catch(() => {});
   };
 
+  const sceneAgents = useMemo<PauliAgent[]>(() => state.avatars.map((avatar) => ({
+    id: avatar.id,
+    agent_key: avatar.id,
+    name: avatar.name,
+    role: avatar.id === 'pauli' ? 'Executive agent' : 'World agent',
+    specialty: avatar.activity_summary || null,
+    status: avatar.state,
+    world_location_key: state.lounge,
+    last_heartbeat_at: avatar.last_event_at || null,
+  })), [state]);
+
   const { listening, transcript, error, lastResponse, start, stop } = useVoiceCommand({ onAccept });
   const activeError = error || (mode === 'agents' ? worldError : mode === 'portfolio' ? portfolioError : councilError);
 
@@ -205,7 +217,7 @@ export default function LoungeClient() {
       {mode === 'agents' && (
         <main className="grid gap-6 px-6 py-6 lg:grid-cols-[1fr_360px] lg:px-8">
           <section className="space-y-4">
-            <ThreeScene avatars={state.avatars} speakingAvatarId={speaker} sceneCue={state.schedule_cue} />
+            <ThreeScene agents={sceneAgents} selectedAgentId={speaker} />
             {transcript && (
               <div className="border border-white/10 bg-[#0e0e0e] px-4 py-3 text-sm">
                 <span className="text-stone-500">You said: </span>{transcript}
