@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import threading
+from contextlib import contextmanager
 from typing import Any
 
 import httpx
@@ -23,6 +25,15 @@ from services.agent_runtime import (
     TransientRuntimeError,
     agent_runtime,
 )
+from services.worker_leases import (
+    DEFAULT_LEASE_SECONDS,
+    WORKER_KEY,
+    WorkerLease,
+    acquire_task_lease,
+    heartbeat_task_lease,
+    reclaim_expired_leases,
+    release_task_lease,
+)
 
 MODEL_TASKS = {"plan", "critique", "guardian"}
 ACTUATOR_TASKS = {"execute", "test", "repair"}
@@ -32,28 +43,41 @@ DETERMINISTIC_TASKS = {"checkpoint", "complete"}
 @shared_task(name="workers.task_execution.tick", bind=True, max_retries=0)
 def task_execution_tick(self) -> dict[str, Any]:
     db = SessionLocal()
+    task: dict[str, Any] | None = None
+    lease: WorkerLease | None = None
     try:
-        task = _claim_ready_task(db)
+        reclaimed = reclaim_expired_leases(db)
+        if reclaimed:
+            db.commit()
+
+        worker_key = getattr(getattr(self, "request", None), "hostname", None) or WORKER_KEY
+        task = _claim_ready_task(db, worker_key=worker_key)
         if not task:
             db.commit()
-            return {"status": "idle", "claimed": 0}
+            return {"status": "idle", "claimed": 0, "reclaimed": reclaimed}
 
-        if task["task_key"] in MODEL_TASKS:
-            result = _execute_model_task(db, task)
-        elif task["task_key"] in ACTUATOR_TASKS:
-            result = _execute_actuator_task(db, task)
-        elif task["task_key"] == "evidence":
-            result = _verify_evidence(db, task)
-        elif task["task_key"] == "checkpoint":
-            result = _create_checkpoint(db, task)
-        elif task["task_key"] == "complete":
-            result = _complete_if_verified(db, task)
-        else:
-            result = _block_task(db, task, "unsupported_task", f"No governed executor is registered for '{task['task_key']}'.")
+        lease = task.pop("_worker_lease")
+        db.commit()
+
+        with _lease_heartbeat(lease):
+            if task["task_key"] in MODEL_TASKS:
+                result = _execute_model_task(db, task)
+            elif task["task_key"] in ACTUATOR_TASKS:
+                result = _execute_actuator_task(db, task)
+            elif task["task_key"] == "evidence":
+                result = _verify_evidence(db, task)
+            elif task["task_key"] == "checkpoint":
+                result = _create_checkpoint(db, task)
+            elif task["task_key"] == "complete":
+                result = _complete_if_verified(db, task)
+            else:
+                result = _block_task(db, task, "unsupported_task", f"No governed executor is registered for '{task['task_key']}'.")
 
         _release_next_task(db, task["mission_id"])
+        release_task_lease(db, lease, recovered=result.get("status") == "recovering")
+        _mark_agent_after_task(db, task, result)
         db.commit()
-        return result
+        return {**result, "worker_key": lease.worker_key, "lease_id": lease.id, "reclaimed": reclaimed}
     except Exception:
         db.rollback()
         raise
@@ -61,7 +85,36 @@ def task_execution_tick(self) -> dict[str, Any]:
         db.close()
 
 
-def _claim_ready_task(db):
+@contextmanager
+def _lease_heartbeat(lease: WorkerLease):
+    """Renew a lease from an independent DB session while bounded work runs."""
+    stop = threading.Event()
+    interval = max(10, DEFAULT_LEASE_SECONDS // 3)
+
+    def beat() -> None:
+        while not stop.wait(interval):
+            heartbeat_db = SessionLocal()
+            try:
+                if not heartbeat_task_lease(heartbeat_db, lease):
+                    heartbeat_db.rollback()
+                    return
+                heartbeat_db.commit()
+            except Exception:
+                heartbeat_db.rollback()
+                return
+            finally:
+                heartbeat_db.close()
+
+    thread = threading.Thread(target=beat, name=f"pauli-lease-{lease.id}", daemon=True)
+    thread.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        thread.join(timeout=2)
+
+
+def _claim_ready_task(db, worker_key: str = WORKER_KEY):
     row = db.execute(
         text(
             """
@@ -78,8 +131,60 @@ def _claim_ready_task(db):
     ).mappings().first()
     if not row:
         return None
-    db.execute(text("update pauli.mission_tasks set status='running', started_at=coalesce(started_at,now()), attempt_count=attempt_count+1, updated_at=now() where id=:id"), {"id": row["id"]})
-    return dict(row)
+
+    lease = acquire_task_lease(db, row["id"], row["organization_id"], worker_key=worker_key)
+    if not lease:
+        return None
+
+    db.execute(
+        text(
+            """
+            update pauli.mission_tasks
+               set status='running', started_at=coalesce(started_at,now()),
+                   attempt_count=attempt_count+1, updated_at=now()
+             where id=:id and status='ready'
+            """
+        ),
+        {"id": row["id"]},
+    )
+    task = dict(row)
+    task["_worker_lease"] = lease
+    _mark_agent_working(db, task)
+    _event(db, task, "TASK_LEASE_ACQUIRED", f"Worker {worker_key} acquired durable task lease.")
+    return task
+
+
+def _mark_agent_working(db, task: dict[str, Any]) -> None:
+    db.execute(
+        text(
+            """
+            update pauli.agents
+               set status='working', last_heartbeat_at=now(), updated_at=now()
+             where id=coalesce(
+               :assigned,
+               (select id from pauli.agents where organization_id=:org and agent_key='pauli' limit 1)
+             )
+            """
+        ),
+        {"assigned": task.get("assigned_agent_id"), "org": task["organization_id"]},
+    )
+
+
+def _mark_agent_after_task(db, task: dict[str, Any], result: dict[str, Any]) -> None:
+    next_status = "recovering" if result.get("status") == "recovering" else ("blocked" if result.get("status") == "blocked" else "idle")
+    db.execute(
+        text(
+            """
+            update pauli.agents
+               set status=:status, last_heartbeat_at=now(), updated_at=now()
+             where id=coalesce(
+               :assigned,
+               (select id from pauli.agents where organization_id=:org and agent_key='pauli' limit 1)
+             )
+            """
+        ),
+        {"status": next_status, "assigned": task.get("assigned_agent_id"), "org": task["organization_id"]},
+    )
 
 
 def _execute_model_task(db, task: dict[str, Any]) -> dict[str, Any]:
@@ -294,6 +399,7 @@ def _recover_task(db, task, incident_type: str, summary: str) -> dict[str, Any]:
     db.execute(text("update pauli.mission_tasks set status='recovering',result=cast(:result as jsonb),updated_at=now() where id=:id"), {"result": json.dumps({"transient_error": summary}), "id": task["id"]})
     db.execute(text("update pauli.missions set status='RECOVERING',updated_at=now() where id=:mission"), {"mission": task["mission_id"]})
     db.execute(text("insert into pauli.incidents(organization_id,mission_id,severity,incident_type,title,summary,status) values(:org,:mission,'warning',:type,'Task recovering',:summary,'recovering')"), {"org": task["organization_id"], "mission": task["mission_id"], "type": incident_type, "summary": summary[:1500]})
+    _event(db, task, "TASK_RECOVERING", summary)
     return {"status": "recovering", "task_id": str(task["id"]), "reason": incident_type}
 
 
