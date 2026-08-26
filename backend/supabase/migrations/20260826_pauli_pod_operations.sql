@@ -14,6 +14,8 @@ create table if not exists pauli.commerce_operations (
   printify_product_id text,
   etsy_listing_id bigint,
   etsy_listing_image_id bigint,
+  printify_published_at timestamptz,
+  etsy_published_at timestamptz,
   approval_id uuid references pauli.approvals(id) on delete set null,
   evidence jsonb not null default '[]'::jsonb,
   error_class text,
