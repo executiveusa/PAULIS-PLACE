@@ -329,16 +329,30 @@ class PODWorkflowService:
         db.execute(text("update pauli.commerce_operations set status='publishing',updated_at=now() where id=:id"), {"id": operation_id})
         db.commit()
 
-        await printify_service.publish_product(str(operation["printify_product_id"]))
-        _append_evidence(db, operation_id, {"stage": "printify_publish_requested", "product_id": operation["printify_product_id"]})
-        db.commit()
+        if not operation.get("printify_published_at"):
+            await printify_service.publish_product(str(operation["printify_product_id"]))
+            db.execute(
+                text("update pauli.commerce_operations set printify_published_at=now(),updated_at=now() where id=:id"),
+                {"id": operation_id},
+            )
+            _append_evidence(db, operation_id, {"stage": "printify_publish_succeeded", "product_id": operation["printify_product_id"]})
+            db.commit()
 
-        etsy_published = await etsy_service.publish_listing(int(operation["etsy_listing_id"]))
+        etsy_published: dict[str, Any] = {}
+        if not operation.get("etsy_published_at"):
+            etsy_published = await etsy_service.publish_listing(int(operation["etsy_listing_id"]))
+            db.execute(
+                text("update pauli.commerce_operations set etsy_published_at=now(),updated_at=now() where id=:id"),
+                {"id": operation_id},
+            )
+            _append_evidence(db, operation_id, {"stage": "etsy_publish_succeeded", "listing_id": int(operation["etsy_listing_id"])})
+            db.commit()
+
         etsy_verified = await etsy_service.get_listing(int(operation["etsy_listing_id"]))
         if str(etsy_verified.get("state", "")).lower() != "active":
             raise PODWorkflowBlocked("Etsy listing did not verify as active after publish")
-
         printify_verified = await printify_service.get_product(str(operation["printify_product_id"]))
+
         evidence = {
             "stage": "published_verified",
             "printify_product_id": str(operation["printify_product_id"]),
@@ -358,7 +372,7 @@ class PODWorkflowService:
             product.external_id = str(operation["etsy_listing_id"])
             product.research_data = {**(product.research_data or {}), "etsy_url": evidence.get("etsy_url")}
         db.commit()
-        return {"status": "published", "replayed": False, "operation_id": operation_id, "evidence": evidence}
+        return {"status": "published", "replayed": bool(operation.get("printify_published_at") or operation.get("etsy_published_at")), "operation_id": operation_id, "evidence": evidence}
 
 
 pod_workflow_service = PODWorkflowService()
