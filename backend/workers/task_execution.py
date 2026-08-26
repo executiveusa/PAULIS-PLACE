@@ -25,6 +25,7 @@ from services.agent_runtime import (
     TransientRuntimeError,
     agent_runtime,
 )
+from services.capability_guard import authorize_task_capabilities, consume_approval_and_spend, redact_secrets
 from services.worker_leases import (
     DEFAULT_LEASE_SECONDS,
     WORKER_KEY,
@@ -269,6 +270,14 @@ def _execute_model_task(db, task: dict[str, Any]) -> dict[str, Any]:
 
 
 def _execute_actuator_task(db, task: dict[str, Any]) -> dict[str, Any]:
+    estimated_spend_cents = int((task.get("acceptance_contract") or {}).get("estimated_spend_cents", 0) or 0)
+    decisions = authorize_task_capabilities(db, task, estimated_spend_cents=estimated_spend_cents)
+    denied = next((decision for decision in decisions if not decision.allowed), None)
+    if denied:
+        event_type = "TASK_APPROVAL_REQUIRED" if denied.decision == "approval_required" else "TASK_CAPABILITY_DENIED"
+        _event(db, task, event_type, f"Capability '{denied.capability_key}' denied: {denied.reason}")
+        return _block_task(db, task, denied.decision, denied.reason)
+
     provider = db.execute(
         text(
             """
@@ -284,12 +293,17 @@ def _execute_actuator_task(db, task: dict[str, Any]) -> dict[str, Any]:
     if not provider:
         return _block_task(db, task, "actuator_unavailable", f"Task '{task['task_key']}' requires a healthy pauli-runtime-v1 actuator provider.")
 
-    payload = {
+    payload = redact_secrets({
         "mission": {"id": str(task["mission_id"]), "title": task["mission_title"], "intent": task["intent_original"], "requested_outcome": task["requested_outcome"]},
         "task": {"id": str(task["id"]), "key": task["task_key"], "title": task["title"], "description": task.get("description")},
         "prior_results": _prior_results(db, task["mission_id"]),
-        "contract": {"protocol": "pauli-runtime-v1", "requires_evidence": True, "self_certification": False},
-    }
+        "contract": {
+            "protocol": "pauli-runtime-v1",
+            "requires_evidence": True,
+            "self_certification": False,
+            "capabilities": [decision.capability_key for decision in decisions],
+        },
+    })
     run_id = db.execute(
         text("insert into pauli.runtime_runs(organization_id,mission_id,task_id,provider_id,status,input_manifest,attempt) values(:org,:mission,:task,:provider,'running',cast(:input as jsonb),:attempt) returning id"),
         {"org": task["organization_id"], "mission": task["mission_id"], "task": task["id"], "provider": provider["id"], "input": json.dumps(payload), "attempt": task["attempt_count"] + 1},
@@ -300,7 +314,7 @@ def _execute_actuator_task(db, task: dict[str, Any]) -> dict[str, Any]:
         if response.status_code in {400, 401, 403, 404, 405, 422}:
             raise NonRetriableRuntimeError(f"actuator rejected request ({response.status_code}): {response.text[:240]}")
         response.raise_for_status()
-        body = response.json()
+        body = redact_secrets(response.json())
     except NonRetriableRuntimeError as exc:
         db.execute(text("update pauli.runtime_runs set status='failed',error_class='non_retriable',error_message=:error,completed_at=now() where id=:id"), {"error": str(exc)[:1000], "id": run_id})
         return _block_task(db, task, "actuator_rejected", str(exc))
@@ -314,11 +328,12 @@ def _execute_actuator_task(db, task: dict[str, Any]) -> dict[str, Any]:
         db.execute(text("update pauli.runtime_runs set status='failed',error_class='evidence_missing',error_message='provider returned no verifiable evidence',output_manifest=cast(:output as jsonb),completed_at=now() where id=:id"), {"output": json.dumps(body), "id": run_id})
         return _block_task(db, task, "evidence_missing", f"Provider {provider['provider_key']} returned no verifiable evidence.")
 
+    consume_approval_and_spend(db, task, decisions)
     db.execute(text("update pauli.runtime_runs set status='completed',output_manifest=cast(:output as jsonb),completed_at=now() where id=:id"), {"output": json.dumps(body), "id": run_id})
     db.execute(text("update pauli.mission_tasks set status='verified',result=cast(:result as jsonb),completed_at=now(),updated_at=now() where id=:id"), {"result": json.dumps(body), "id": task["id"]})
     db.execute(
         text("insert into pauli.evidence_receipts(organization_id,mission_id,task_id,runtime_run_id,status,summary,tests,artifacts,verification) values(:org,:mission,:task,:run,'verified',:summary,cast(:tests as jsonb),cast(:artifacts as jsonb),cast(:verification as jsonb))"),
-        {"org": task["organization_id"], "mission": task["mission_id"], "task": task["id"], "run": run_id, "summary": f"Verified actuator output from {provider['name']}", "tests": json.dumps(body.get("tests") or []), "artifacts": json.dumps(evidence), "verification": json.dumps({"provider": provider["provider_key"], "protocol": "pauli-runtime-v1"})},
+        {"org": task["organization_id"], "mission": task["mission_id"], "task": task["id"], "run": run_id, "summary": f"Verified actuator output from {provider['name']}", "tests": json.dumps(body.get("tests") or []), "artifacts": json.dumps(evidence), "verification": json.dumps({"provider": provider["provider_key"], "protocol": "pauli-runtime-v1", "capabilities": [decision.capability_key for decision in decisions]})},
     )
     _event(db, task, "TASK_VERIFIED", f"Actuator task '{task['task_key']}' verified with provider evidence.")
     return {"status": "verified", "task_id": str(task["id"]), "provider": provider["provider_key"]}
@@ -358,50 +373,81 @@ def _release_next_task(db, mission_id) -> None:
     db.execute(
         text(
             """
-            update pauli.mission_tasks t
-            set status='ready', updated_at=now()
-            where t.mission_id=:mission and t.status='pending'
-              and not exists (
-                select 1 from unnest(t.depends_on) dep
-                join pauli.mission_tasks prerequisite on prerequisite.id=dep
-                where prerequisite.status<>'verified'
-              )
+            update pauli.mission_tasks candidate
+               set status='ready',updated_at=now()
+             where candidate.id = (
+               select t.id
+                 from pauli.mission_tasks t
+                where t.mission_id=:mission
+                  and t.status='pending'
+                  and not exists (
+                    select 1 from unnest(t.depends_on) dep
+                    join pauli.mission_tasks d on d.id=dep
+                    where d.status<>'verified'
+                  )
+                order by t.created_at asc
+                limit 1
+             )
             """
         ),
         {"mission": mission_id},
     )
 
 
-def _agent_for_task(db, task):
+def _agent_for_task(db, task: dict[str, Any]):
     row = db.execute(
-        text("select id,agent_key,name,role,specialty,identity,heart,soul,skill_manifest from pauli.agents where id=:assigned or (organization_id=:org and agent_key='pauli') order by case when id=:assigned then 0 else 1 end limit 1"),
+        text(
+            """
+            select * from pauli.agents
+             where id=coalesce(:assigned,(select id from pauli.agents where organization_id=:org and agent_key='pauli' limit 1))
+             limit 1
+            """
+        ),
         {"assigned": task.get("assigned_agent_id"), "org": task["organization_id"]},
     ).mappings().first()
     if not row:
-        raise NonRetriableRuntimeError("no persistent agent identity is available for task")
+        raise NonRetriableRuntimeError("No persistent Pauli agent identity is available for task execution.")
     return dict(row)
 
 
-def _prior_results(db, mission_id) -> dict[str, Any]:
-    rows = db.execute(text("select task_key,status,result from pauli.mission_tasks where mission_id=:mission and status='verified' order by created_at"), {"mission": mission_id}).mappings().all()
-    return {row["task_key"]: row["result"] for row in rows}
+def _prior_results(db, mission_id) -> list[dict[str, Any]]:
+    rows = db.execute(
+        text("select task_key,status,result from pauli.mission_tasks where mission_id=:mission and status='verified' order by created_at asc"),
+        {"mission": mission_id},
+    ).mappings().all()
+    return [dict(row) for row in rows]
 
 
-def _block_task(db, task, incident_type: str, summary: str) -> dict[str, Any]:
-    db.execute(text("update pauli.mission_tasks set status='blocked',result=cast(:result as jsonb),updated_at=now() where id=:id"), {"result": json.dumps({"blocker": summary}), "id": task["id"]})
-    db.execute(text("update pauli.missions set status='BLOCKED',updated_at=now() where id=:mission"), {"mission": task["mission_id"]})
-    db.execute(text("insert into pauli.incidents(organization_id,mission_id,agent_id,severity,incident_type,title,summary,status) values(:org,:mission,:agent,'error',:type,'Task blocked',:summary,'open')"), {"org": task["organization_id"], "mission": task["mission_id"], "agent": task.get("assigned_agent_id"), "type": incident_type, "summary": summary[:1500]})
-    _event(db, task, "TASK_BLOCKED", summary)
-    return {"status": "blocked", "task_id": str(task["id"]), "reason": incident_type}
+def _block_task(db, task: dict[str, Any], reason: str, detail: str) -> dict[str, Any]:
+    db.execute(text("update pauli.mission_tasks set status='blocked',result=cast(:result as jsonb),updated_at=now() where id=:id"), {"result": json.dumps({"reason": reason, "detail": detail}), "id": task["id"]})
+    db.execute(text("update pauli.missions set status='BLOCKED',updated_at=now() where id=:mission and status in ('EXECUTING','RECOVERING')"), {"mission": task["mission_id"]})
+    _event(db, task, "TASK_BLOCKED", detail)
+    return {"status": "blocked", "task_id": str(task["id"]), "reason": reason}
 
 
-def _recover_task(db, task, incident_type: str, summary: str) -> dict[str, Any]:
-    db.execute(text("update pauli.mission_tasks set status='recovering',result=cast(:result as jsonb),updated_at=now() where id=:id"), {"result": json.dumps({"transient_error": summary}), "id": task["id"]})
+def _recover_task(db, task: dict[str, Any], reason: str, detail: str) -> dict[str, Any]:
+    db.execute(text("update pauli.mission_tasks set status='recovering',result=cast(:result as jsonb),updated_at=now() where id=:id"), {"result": json.dumps({"reason": reason, "detail": detail}), "id": task["id"]})
     db.execute(text("update pauli.missions set status='RECOVERING',updated_at=now() where id=:mission"), {"mission": task["mission_id"]})
-    db.execute(text("insert into pauli.incidents(organization_id,mission_id,severity,incident_type,title,summary,status) values(:org,:mission,'warning',:type,'Task recovering',:summary,'recovering')"), {"org": task["organization_id"], "mission": task["mission_id"], "type": incident_type, "summary": summary[:1500]})
-    _event(db, task, "TASK_RECOVERING", summary)
-    return {"status": "recovering", "task_id": str(task["id"]), "reason": incident_type}
+    _event(db, task, "TASK_RECOVERING", detail)
+    return {"status": "recovering", "task_id": str(task["id"]), "reason": reason}
 
 
-def _event(db, task, event_type: str, summary: str) -> None:
-    db.execute(text("insert into pauli.mission_events(organization_id,mission_id,task_id,correlation_id,event_type,source,public_summary,payload) values(:org,:mission,:task,:correlation,:type,'task-execution',:summary,'{}'::jsonb)"), {"org": task["organization_id"], "mission": task["mission_id"], "task": task["id"], "correlation": task["correlation_id"], "type": event_type, "summary": summary[:1500]})
+def _event(db, task: dict[str, Any], event_type: str, summary: str) -> None:
+    db.execute(
+        text(
+            """
+            insert into pauli.mission_events(
+              organization_id,mission_id,task_id,agent_id,correlation_id,event_type,source,public_summary,payload
+            ) values(:org,:mission,:task,:agent,:correlation,:event_type,'task-execution',:summary,'{}'::jsonb)
+            """
+        ),
+        {
+            "org": task["organization_id"],
+            "mission": task["mission_id"],
+            "task": task["id"],
+            "agent": task.get("assigned_agent_id"),
+            "correlation": task["correlation_id"],
+            "event_type": event_type,
+            "summary": summary,
+        },
+    )
