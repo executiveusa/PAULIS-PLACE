@@ -69,7 +69,7 @@ export default function LoungeClient() {
       setState(EMPTY_STATE);
     });
 
-    loungeApi.scenes(12).then((result) => {
+    loungeApi.scenes(16).then((result) => {
       if (!cancelled) setScenes(result.scenes);
     }).catch(() => {
       if (!cancelled) setScenes([]);
@@ -85,7 +85,7 @@ export default function LoungeClient() {
       setCouncilError(error instanceof Error ? error.message : 'Council evidence unavailable');
     });
 
-    const configured = process.env.NEXT_PUBLIC_LOUNGE_WS_URL;
+    const configured = process.env.NEXT_PUBLIC_LOUNGE_WS_URL || process.env.NEXT_PUBLIC_WS_URL;
     let ws: WebSocket | null = null;
     if (configured) {
       try {
@@ -97,7 +97,7 @@ export default function LoungeClient() {
             const data = JSON.parse(message.data);
             const envelope: Envelope | undefined = data?.envelope;
             if (data?.type !== 'event' || !envelope) return;
-            setScenes((current) => [envelope, ...current].slice(0, 12));
+            setScenes((current) => [envelope, ...current].slice(0, 16));
             const target = envelope?.body?.target_avatar;
             if (target) {
               setSpeaker(target);
@@ -119,38 +119,15 @@ export default function LoungeClient() {
   }, []);
 
   const onAccept = (env: Envelope) => {
-    setScenes((current) => [env, ...current].slice(0, 12));
+    setScenes((current) => [env, ...current].slice(0, 16));
     const target = env?.body?.target_avatar;
     if (target) {
       setSpeaker(target);
       window.setTimeout(() => setSpeaker(null), 3500);
     }
-    loungeApi.scenes(16).then(r => setScenes(r.scenes)).catch(() => {});
+    loungeApi.scenes(16).then((result) => setScenes(result.scenes)).catch(() => {});
   };
 
-  useEffect(() => {
-    load();
-    const poll = setInterval(load, 15000);
-    const wsUrl = process.env.NEXT_PUBLIC_LOUNGE_WS_URL || process.env.NEXT_PUBLIC_WS_URL;
-    let ws: WebSocket | undefined;
-    if (wsUrl) {
-      try {
-        ws = new WebSocket(wsUrl);
-        ws.onmessage = (message) => {
-          try {
-            const data = JSON.parse(message.data);
-            if (data?.type === 'event' && data.envelope) {
-              setScenes(prev => [data.envelope, ...prev].slice(0, 16));
-              setBackendStatus('live');
-            }
-          } catch {}
-        };
-      } catch {}
-    }
-    return () => { clearInterval(poll); ws?.close(); };
-  }, []);
-
-  const onAccept = (env: Envelope) => setScenes(prev => [env, ...prev].slice(0, 16));
   const { listening, transcript, error, lastResponse, start, stop } = useVoiceCommand({ onAccept });
   const activeError = error || (mode === 'agents' ? worldError : mode === 'portfolio' ? portfolioError : councilError);
 
