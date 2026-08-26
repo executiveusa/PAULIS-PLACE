@@ -9,7 +9,6 @@ import os
 import socket
 import uuid
 from dataclasses import dataclass
-from datetime import timedelta
 from typing import Any
 
 from sqlalchemy import text
@@ -39,7 +38,21 @@ def reclaim_expired_leases(db) -> int:
         )
     ).all()
     for (task_id,) in rows:
-        db.execute(
+        task = db.execute(
+            text(
+                """
+                select t.id, t.organization_id, t.mission_id, m.correlation_id
+                  from pauli.mission_tasks t
+                  join pauli.missions m on m.id=t.mission_id
+                 where t.id=:task
+                 for update of t
+                """
+            ),
+            {"task": task_id},
+        ).mappings().first()
+        if not task:
+            continue
+        changed = db.execute(
             text(
                 """
                 update pauli.mission_tasks
@@ -48,6 +61,32 @@ def reclaim_expired_leases(db) -> int:
                 """
             ),
             {"task": task_id},
+        )
+        if changed.rowcount != 1:
+            continue
+        db.execute(
+            text("update pauli.missions set status='RECOVERING',updated_at=now() where id=:mission and status='EXECUTING'"),
+            {"mission": task["mission_id"]},
+        )
+        db.execute(
+            text(
+                """
+                insert into pauli.mission_events(
+                  organization_id,mission_id,task_id,correlation_id,event_type,source,public_summary,payload,idempotency_key
+                ) values(
+                  :org,:mission,:task,:correlation,'TASK_LEASE_EXPIRED','worker-leases',
+                  'Worker lease expired; task entered explicit recovery.',
+                  jsonb_build_object('reason','worker_heartbeat_expired'),:idem
+                ) on conflict (organization_id,idempotency_key) do nothing
+                """
+            ),
+            {
+                "org": task["organization_id"],
+                "mission": task["mission_id"],
+                "task": task["id"],
+                "correlation": task["correlation_id"],
+                "idem": f"lease-expired:{task['id']}",
+            },
         )
     return len(rows)
 
