@@ -42,7 +42,7 @@ jobs:
           pip install pytest
 
       - name: Compile production runtime
-        run: python -m compileall -q backend/services/agent_runtime.py backend/services/worker_leases.py backend/workers/mission_control.py backend/workers/task_execution.py
+        run: python -m compileall -q backend/services/agent_runtime.py backend/services/worker_leases.py backend/services/capability_guard.py backend/workers/mission_control.py backend/workers/task_execution.py
 
       - name: Run tests
         run: python -m pytest backend/tests/ -q
