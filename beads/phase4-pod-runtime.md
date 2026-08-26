@@ -1,6 +1,6 @@
 # Phase 4 — Governed POD Revenue Loop
 
-Status: implementation branch ready for PR/CI.
+Status: PR/CI gate ready.
 Canonical issue: #29. Issue #31 is a duplicate and should not be used as a second authority.
 
 Scope:
@@ -13,6 +13,7 @@ Scope:
 - per-provider publish completion persistence for partial-failure recovery
 - provider-state verification after publish
 - legacy product approval endpoint cannot directly publish POD products
+- focused fail-closed/idempotency contract tests
 - no secrets committed
 
 Phase completion requires full repository CI green and merge to `main`.
