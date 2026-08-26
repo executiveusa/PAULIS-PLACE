@@ -61,7 +61,10 @@ class Settings(BaseSettings):
     etsy_secret: str = ""
     etsy_access_token: str = ""
     etsy_refresh_token: str = ""
+    etsy_shop_id: str = ""
     etsy_shop_url: str = ""
+    etsy_shipping_profile_id: int = 0
+    etsy_readiness_state_id: int = 0
 
     # Fiverr
     fiverr_access_token: str = ""
