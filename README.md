@@ -129,8 +129,25 @@ Important variables include:
 - model-provider keys
 - Twilio/voice credentials when enabled
 - Vercel/Coolify/compute provider credentials when enabled
+- Printify shop/token when the POD factory is enabled
+- Etsy API key/secret, OAuth token, shop ID, shipping profile ID, and readiness-state ID when Etsy POD is enabled
 
 Never commit secrets.
+
+## Governed POD revenue loop
+
+The first commercial execution path is a replay-safe Printify → Etsy physical-POD workflow. The canonical service is `backend/services/pod_workflow.py`, backed by the additive `pauli.commerce_operations` ledger.
+
+Rules for this path:
+
+- Printify blueprint, provider, variants, shop, and uploaded image are verified before product creation.
+- Every external write passes through the capability guard; missing/revoked grants fail closed.
+- External IDs are persisted after each successful stage so retry/recovery does not silently duplicate products or listings.
+- Etsy physical drafts require real shop, shipping-profile, processing/readiness-profile, and taxonomy context.
+- Etsy listings remain drafts until a verified image exists and the canonical `pauli.approvals` publish gate is approved.
+- Final publish is a distinct consequential capability and is never inferred from a UI button or product status.
+- Published state is verified back from the providers before Pauli may report success.
+- Missing credentials/configuration are blockers, never synthetic success.
 
 ## Deployment direction
 
