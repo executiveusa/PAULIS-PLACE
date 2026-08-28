@@ -64,13 +64,41 @@ export interface PauliIncidentSummary {
   detected_at: string;
 }
 
+export interface OwnerDecision {
+  priority: number;
+  action: string;
+  reason: string;
+  evidence: string[];
+}
+
+export interface OwnerBrief {
+  outcome: {
+    coverage_status: 'complete' | 'partial' | 'stale' | 'missing';
+    as_of?: string | null;
+    revenue_cents: number | null;
+    cost_cents: number | null;
+    profit_cents: number | null;
+    pod_published: number;
+    digital_sell_ready: number;
+    software_preview_ready: number;
+  };
+  decisions: OwnerDecision[];
+  evidence: Array<Record<string, unknown>>;
+  needs_you: Array<Record<string, unknown>>;
+  working_now: Array<Record<string, unknown>>;
+  coverage_status: 'complete' | 'partial' | 'stale' | 'missing';
+  as_of?: string | null;
+  provenance: Array<Record<string, unknown>>;
+  source_hash?: string | null;
+  created_at?: string;
+}
+
 export interface PauliOverview {
   active_missions: number;
   agents_working: number;
   approvals_pending: number;
   open_incidents: number;
-  revenue_today_cents: number | string;
-  spend_today_cents: number | string;
+  owner_brief: OwnerBrief;
   missions: PauliMissionSummary[];
   agents: PauliAgentSummary[];
   approvals: PauliApprovalSummary[];
