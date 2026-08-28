@@ -81,38 +81,41 @@ export interface PortfolioDecision {
 
 export interface LoungeAvatarState {
   id: string;
+  database_id?: string | null;
   name: string;
+  role: string;
   position: [number, number, number];
   model: string;
   state: string;
-  activity_summary?: string;
+  activity_summary?: string | null;
   last_event_at?: string | null;
+  location?: { key?: string | null; name?: string | null } | null;
+  mission?: { id: string; title?: string | null; status?: string | null } | null;
 }
+
 export interface LoungeState {
   lounge: string;
   setting: string;
   avatars: LoungeAvatarState[];
   schedule_cue: string;
+  organization_slug?: string;
+  source?: string;
+  status?: string;
+  generated_at?: string;
+  counts?: {
+    active_missions?: number;
+    approvals_pending?: number;
+    verified_evidence?: number;
+  };
 }
 
-export const AVATAR_ROSTER = [
-  { id: 'pauli', name: 'Pauli', role: 'Executive agent' },
-  { id: 'scout', name: 'Scout', role: 'Research' },
-  { id: 'strategist', name: 'Strategist', role: 'Strategy' },
-  { id: 'builder', name: 'Builder', role: 'Engineering' },
-  { id: 'critic', name: 'Critic', role: 'Gauntlet' },
-  { id: 'guardian', name: 'Guardian', role: 'Safety & policy' },
-  { id: 'publisher', name: 'Publisher', role: 'Deployment' },
-  { id: 'sales', name: 'Sales', role: 'Revenue' },
-] as const;
-
-export const hemmes = {
+export const hermes = {
   health: () => fetchAPI<HermesHealth>('/api/hermes/health'),
   envelopes: (limit?: number) => fetchAPI<{ envelopes: Envelope[] }>(`/api/envelopes/recent?limit=${limit ?? 30}`),
 };
 export const lounge = {
   state: () => fetchAPI<LoungeState>('/api/lounge/state'),
-  scenes: (limit?: number) => fetchAPI<{ scenes: Envelope[] }>(`/api/lounge/scenes?limit=${limit ?? 20}`),
+  scenes: (limit?: number) => fetchAPI<{ scenes: Envelope[]; source?: string }>(`/api/lounge/scenes?limit=${limit ?? 20}`),
 };
 export const council = {
   portfolioDeliberations: (limit?: number) => fetchAPI<{ deliberations: PortfolioDecision[]; count: number }>(`/api/council/portfolio/deliberations?limit=${limit ?? 20}`),
