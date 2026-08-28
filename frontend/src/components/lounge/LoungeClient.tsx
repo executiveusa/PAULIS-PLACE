@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, Radio, WifiOff } from 'lucide-react';
-import { council as councilApi, lounge as loungeApi, Envelope, LoungeState, PortfolioDecision, AVATAR_ROSTER } from '@/lib/loungeApi';
+import { council as councilApi, lounge as loungeApi, Envelope, LoungeState, PortfolioDecision } from '@/lib/loungeApi';
 import { fetchPauliverseSnapshot, PauliverseSnapshot } from '@/lib/pauliverseApi';
 import { useVoiceCommand } from './useVoiceCommand';
 
@@ -12,22 +12,13 @@ const ThreeScene = dynamic(() => import('./ThreeScene'), { ssr: false });
 const CommandWorld = dynamic(() => import('./CommandWorld'), { ssr: false });
 const CouncilChamber = dynamic(() => import('./CouncilChamber'), { ssr: false });
 
-const POSITIONS: Array<[number, number, number]> = [
-  [0, 0, 0], [-3.8, 0, -1.5], [3.8, 0, -1.5], [-5.4, 0, 2.2],
-  [5.4, 0, 2.2], [-2.7, 0, 4.2], [2.7, 0, 4.2], [0, 0, 5.3],
-];
-
 const EMPTY_STATE: LoungeState = {
   lounge: "Pauli's Place",
-  setting: 'Operational world · live backend state only',
-  avatars: AVATAR_ROSTER.map((agent, index) => ({
-    id: agent.id,
-    name: agent.name,
-    position: POSITIONS[index] || [0, 0, 0],
-    model: 'persistent-agent',
-    state: 'offline',
-  })),
-  schedule_cue: 'Waiting for live world state',
+  setting: 'Operational world · canonical backend state only',
+  avatars: [],
+  schedule_cue: 'Waiting for canonical world state',
+  source: 'pauli.control_plane',
+  status: 'unavailable',
 };
 
 type WorldMode = 'portfolio' | 'council' | 'agents';
@@ -44,65 +35,113 @@ export default function LoungeClient() {
   const [portfolio, setPortfolio] = useState<PauliverseSnapshot | null>(null);
   const [portfolioError, setPortfolioError] = useState('');
 
-  useEffect(() => {
-    let cancelled = false;
-
-    fetchPauliverseSnapshot().then((snapshot) => {
-      if (cancelled) return;
-      setPortfolio(snapshot);
-      setPortfolioError('');
-    }).catch((error) => {
-      if (cancelled) return;
-      setPortfolio(null);
-      setPortfolioError(error instanceof Error ? error.message : 'Portfolio snapshot unavailable');
-    });
-
-    loungeApi.state().then((next) => {
-      if (cancelled) return;
+  const refreshWorldState = async () => {
+    try {
+      const next = await loungeApi.state();
       setState(next);
       setBackendUp(true);
-      setWorldError('');
-    }).catch((error) => {
-      if (cancelled) return;
+      setWorldError(next.status && next.status !== 'ready' ? next.schedule_cue : '');
+    } catch (error) {
       setBackendUp(false);
       setWorldError(error instanceof Error ? error.message : 'World backend unavailable');
       setState(EMPTY_STATE);
-    });
+    }
+  };
 
-    loungeApi.scenes(12).then((result) => {
-      if (!cancelled) setScenes(result.scenes);
-    }).catch(() => {
-      if (!cancelled) setScenes([]);
-    });
+  const onAccept = (env: Envelope) => {
+    setScenes((current) => [env, ...current].slice(0, 16));
+    const target = env?.body?.target_avatar || env?.body?.agent_id;
+    if (target) {
+      setSpeaker(target);
+      window.setTimeout(() => setSpeaker(null), 3500);
+    }
+    void refreshWorldState();
+  };
 
-    councilApi.portfolioDeliberations(12).then((result) => {
-      if (cancelled) return;
-      setDecisions(result.deliberations);
-      setCouncilError('');
-    }).catch((error) => {
-      if (cancelled) return;
-      setDecisions([]);
-      setCouncilError(error instanceof Error ? error.message : 'Council evidence unavailable');
-    });
+  const { listening, transcript, error, lastResponse, start, stop } = useVoiceCommand({ onAccept });
 
-    const configured = process.env.NEXT_PUBLIC_LOUNGE_WS_URL;
-    let ws: WebSocket | null = null;
-    if (configured) {
+  useEffect(() => {
+    let cancelled = false;
+
+    const refreshPortfolio = async () => {
       try {
-        ws = new WebSocket(configured);
-        ws.onopen = () => setBackendUp(true);
-        ws.onerror = () => setBackendUp(false);
+        const snapshot = await fetchPauliverseSnapshot();
+        if (cancelled) return;
+        setPortfolio(snapshot);
+        setPortfolioError('');
+      } catch (err) {
+        if (cancelled) return;
+        setPortfolio(null);
+        setPortfolioError(err instanceof Error ? err.message : 'Portfolio snapshot unavailable');
+      }
+    };
+
+    const refreshAgents = async () => {
+      try {
+        const next = await loungeApi.state();
+        if (cancelled) return;
+        setState(next);
+        setBackendUp(true);
+        setWorldError(next.status && next.status !== 'ready' ? next.schedule_cue : '');
+      } catch (err) {
+        if (cancelled) return;
+        setBackendUp(false);
+        setWorldError(err instanceof Error ? err.message : 'World backend unavailable');
+        setState(EMPTY_STATE);
+      }
+    };
+
+    const refreshScenes = async () => {
+      try {
+        const result = await loungeApi.scenes(16);
+        if (!cancelled) setScenes(result.scenes);
+      } catch {
+        if (!cancelled) setScenes([]);
+      }
+    };
+
+    const refreshCouncil = async () => {
+      try {
+        const result = await councilApi.portfolioDeliberations(12);
+        if (cancelled) return;
+        setDecisions(result.deliberations);
+        setCouncilError('');
+      } catch (err) {
+        if (cancelled) return;
+        setDecisions([]);
+        setCouncilError(err instanceof Error ? err.message : 'Council evidence unavailable');
+      }
+    };
+
+    void refreshPortfolio();
+    void refreshAgents();
+    void refreshScenes();
+    void refreshCouncil();
+
+    const poll = window.setInterval(() => {
+      void refreshAgents();
+      void refreshPortfolio();
+    }, 15000);
+
+    const wsUrl = process.env.NEXT_PUBLIC_LOUNGE_WS_URL || process.env.NEXT_PUBLIC_WS_URL;
+    let ws: WebSocket | undefined;
+    if (wsUrl) {
+      try {
+        ws = new WebSocket(wsUrl);
+        ws.onopen = () => { if (!cancelled) setBackendUp(true); };
+        ws.onerror = () => { if (!cancelled) setBackendUp(false); };
         ws.onmessage = (message) => {
           try {
             const data = JSON.parse(message.data);
             const envelope: Envelope | undefined = data?.envelope;
-            if (data?.type !== 'event' || !envelope) return;
-            setScenes((current) => [envelope, ...current].slice(0, 12));
-            const target = envelope?.body?.target_avatar;
+            if (data?.type !== 'event' || !envelope || cancelled) return;
+            setScenes((current) => [envelope, ...current].slice(0, 16));
+            const target = envelope?.body?.target_avatar || envelope?.body?.agent_id;
             if (target) {
               setSpeaker(target);
               window.setTimeout(() => setSpeaker(null), 3500);
             }
+            void refreshAgents();
           } catch {
             // Malformed realtime event: ignore. Never synthesize operational state.
           }
@@ -114,44 +153,11 @@ export default function LoungeClient() {
 
     return () => {
       cancelled = true;
+      window.clearInterval(poll);
       ws?.close();
     };
   }, []);
 
-  const onAccept = (env: Envelope) => {
-    setScenes((current) => [env, ...current].slice(0, 12));
-    const target = env?.body?.target_avatar;
-    if (target) {
-      setSpeaker(target);
-      window.setTimeout(() => setSpeaker(null), 3500);
-    }
-    loungeApi.scenes(16).then(r => setScenes(r.scenes)).catch(() => {});
-  };
-
-  useEffect(() => {
-    load();
-    const poll = setInterval(load, 15000);
-    const wsUrl = process.env.NEXT_PUBLIC_LOUNGE_WS_URL || process.env.NEXT_PUBLIC_WS_URL;
-    let ws: WebSocket | undefined;
-    if (wsUrl) {
-      try {
-        ws = new WebSocket(wsUrl);
-        ws.onmessage = (message) => {
-          try {
-            const data = JSON.parse(message.data);
-            if (data?.type === 'event' && data.envelope) {
-              setScenes(prev => [data.envelope, ...prev].slice(0, 16));
-              setBackendStatus('live');
-            }
-          } catch {}
-        };
-      } catch {}
-    }
-    return () => { clearInterval(poll); ws?.close(); };
-  }, []);
-
-  const onAccept = (env: Envelope) => setScenes(prev => [env, ...prev].slice(0, 16));
-  const { listening, transcript, error, lastResponse, start, stop } = useVoiceCommand({ onAccept });
   const activeError = error || (mode === 'agents' ? worldError : mode === 'portfolio' ? portfolioError : councilError);
 
   return (
@@ -163,7 +169,7 @@ export default function LoungeClient() {
           </Link>
           <div>
             <div className="text-[10px] uppercase tracking-[0.34em] text-amber-100/60">Owner observation cockpit</div>
-            <h1 className="mt-1 text-xl font-semibold">Pauli's World</h1>
+            <h1 className="mt-1 text-xl font-semibold">Pauli&apos;s World</h1>
             <p className="mt-0.5 text-xs text-stone-500">Portfolio topology, council dissent, operational agents, evidence and gates. No fabricated activity.</p>
           </div>
         </div>
@@ -228,6 +234,10 @@ export default function LoungeClient() {
       {mode === 'agents' && (
         <main className="grid gap-6 px-6 py-6 lg:grid-cols-[1fr_360px] lg:px-8">
           <section className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 text-[10px] uppercase tracking-wider text-stone-600">
+              <span>Source: {state.source || 'unknown'}</span>
+              <span>{state.generated_at || ''}</span>
+            </div>
             <ThreeScene avatars={state.avatars} speakingAvatarId={speaker} sceneCue={state.schedule_cue} />
             {transcript && (
               <div className="border border-white/10 bg-[#0e0e0e] px-4 py-3 text-sm">
@@ -246,7 +256,7 @@ export default function LoungeClient() {
               <div className="text-[10px] uppercase tracking-[0.28em] text-stone-500">Verified event feed</div>
               <ul className="mt-4 max-h-[640px] space-y-2 overflow-y-auto text-xs">
                 {scenes.length === 0 && (
-                  <li className="border border-white/10 p-4 text-stone-600">No verified world events have been received.</li>
+                  <li className="border border-white/10 p-4 text-stone-600">No persisted world events have been received.</li>
                 )}
                 {scenes.map((scene) => (
                   <li key={`${scene.event_id}-${scene.ts}`} className="border border-white/10 bg-black/20 p-3">
