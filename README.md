@@ -33,6 +33,28 @@ The human should not have to operate Git, Docker, cloud infrastructure, model ro
 - The 3D world must display real backend state rather than fabricated activity.
 - Ordinary work loops until the requested outcome is achieved or a real circuit breaker is reached.
 
+## Owner experience
+
+The default UI is designed to feel like **a business you can talk to**, not an operator console.
+
+Primary surfaces:
+
+- **Home** — money, what changed, Needs You, Working Now, and recent outcomes.
+- **Pauli** — the primary voice/text command surface for stating the outcome you want.
+- **Work** — mission and evidence drill-down, ordered as Outcome → Decision → Evidence → technical trace.
+- **World** — optional visual observability driven only by real backend state.
+
+Owner-facing rules:
+
+- Revenue, cost, and profit cards come from the source-qualified Phase 7 owner brief.
+- Missing financial coverage is shown as **Unknown**, never fabricated `$0`.
+- Stale or partial financial data is labeled before any scaling recommendation is shown.
+- Consequential actions interrupt the owner only under **Needs You**.
+- **Working Now** displays real active/recovering/blocked agent state; it never animates fake work.
+- Provider health, raw task state, branches, commits, logs, and runtime traces remain available as drill-down rather than dominating Home.
+- Failure copy is plain-language and explicit about what did not happen, whether money was spent, and what Pauli is doing next.
+- Mobile navigation is first-class: **Home | Pauli | Work | World**.
+
 ## Composio integration
 
 Composio is the broad SaaS integration fabric, not the Pauli control plane. Pauli retains tenant identity, mission authority, approvals, auditing, and budgets.
@@ -75,7 +97,7 @@ RLS is enabled on all tenant-owned tables. A user must be a member of a tenant t
 ## Current applications
 
 ```text
-frontend/     Next.js application, dashboards, approvals, research, observation, integrations, 3D lounge/world prototype
+frontend/     Next.js owner experience plus technical drill-down routes and Pauli's World prototype
 backend/      FastAPI API, agents, services, model routing, event bus, workers, payments, research, voice, integrations
 icm/          durable context and operating artifacts
 beads/        work tracking
