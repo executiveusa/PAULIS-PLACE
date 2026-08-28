@@ -6,7 +6,7 @@ import {
   Activity,
   AlertTriangle,
   ArrowRight,
-  BriefcaseBusiness,
+  Briefcase,
   Check,
   CircleDollarSign,
   Home,
@@ -16,8 +16,7 @@ import {
   Radio,
   Send,
   Sparkles,
-  UserRoundCheck,
-  Users,
+  UserCheck,
   X,
 } from 'lucide-react';
 import {
@@ -254,7 +253,7 @@ export default function PauliHome() {
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
             <MoneyCard label="Revenue" value={money(outcomeData?.revenue_cents)} sublabel={coverageText(coverage)} coverage={coverage} icon={CircleDollarSign} />
-            <MoneyCard label="Profit" value={money(outcomeData?.profit_cents)} sublabel={outcomeData?.cost_cents == null ? 'Costs unknown until coverage is verified' : `${money(outcomeData.cost_cents)} covered cost`} coverage={coverage} icon={BriefcaseBusiness} />
+            <MoneyCard label="Profit" value={money(outcomeData?.profit_cents)} sublabel={outcomeData?.cost_cents == null ? 'Costs unknown until coverage is verified' : `${money(outcomeData.cost_cents)} covered cost`} coverage={coverage} icon={Briefcase} />
           </div>
         </section>
 
@@ -272,7 +271,7 @@ export default function PauliHome() {
                       <h3 className="mt-2 text-lg font-semibold tracking-[-0.025em]">{humanize(approval.action_class)}</h3>
                       <p className="mt-2 text-sm leading-6 text-black/50">{approval.max_spend_cents ? `Maximum authorized spend: ${money(approval.max_spend_cents)}.` : 'No spend is authorized by this approval.'} Scope stays limited to this action.</p>
                     </div>
-                    <UserRoundCheck className="h-5 w-5 shrink-0 text-black/35" />
+                    <UserCheck className="h-5 w-5 shrink-0 text-black/35" />
                   </div>
                   <div className="mt-5 flex gap-2">
                     <button onClick={() => void decide(approval, 'deny')} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-black/10 px-4 py-3 text-sm font-semibold"><X className="h-4 w-4" /> Decline</button>
