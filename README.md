@@ -149,6 +149,22 @@ Rules for this path:
 - Published state is verified back from the providers before Pauli may report success.
 - Missing credentials/configuration are blockers, never synthetic success.
 
+## Governed software factory
+
+Software missions use `backend/services/software_factory.py` and the `pauli.software_operations` / `pauli.software_receipts` ledger.
+
+Rules for this path:
+
+- A structured objective and acceptance criteria are persisted before code work begins.
+- Each mission uses an isolated workspace and a deterministic `pauli/` branch; autonomous workers cannot target `main`, `master`, or production refs.
+- Workspace use, GitHub branch writes, and preview deployments pass through the same deny-by-default capability guard used by other actuators.
+- Build and test receipts must contain objective passing exit status before the operation can advance.
+- Independent critic and Guardian receipts must cite real artifact evidence; rejection returns the operation to repair.
+- Executor commands are bounded argv lists, not shell strings; shell chaining and redirection are rejected by contract.
+- A preview deployment ID and HTTPS URL are persisted so retries reuse the same deployment record instead of inventing duplicate success.
+- Production deployment is a distinct `software.production.deploy` action and requires canonical human approval after a verified preview.
+- Owner-facing completion should present outcome and evidence first; branch, commit, command, and runtime traces remain drill-down detail.
+
 ## Deployment direction
 
 - **Vercel** — mobile/web frontend and previews.
