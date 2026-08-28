@@ -77,3 +77,26 @@ risks:
   - Major-version dependency changes may reveal compatibility issues in CI.
 next_action: Run PR CI, inspect failures and review comments, repair until green, then request human approval to merge.
 human_needed: true
+
+## bead-0004
+id: bead-0004
+timestamp: 2026-08-28T19:15:00Z
+actor: GPT-5.6 Sol (Production Readiness)
+phase: World Reality Bridge / Canonical Truth
+repo: executiveusa/PAULIS-PLACE
+branch: feat/system-world-truth-001
+files_changed:
+  - backend/api/health.py
+  - backend/tests/test_world_state.py
+  - frontend/src/lib/loungeApi.ts
+  - frontend/src/components/lounge/LoungeClient.tsx
+  - frontend/src/components/lounge/ThreeScene.tsx
+  - beads/BEADS_PROTOCOL.md
+decision: Replace the lounge hardcoded operational roster with a tenant-scoped projection of pauli.agents, pauli.world_presence, pauli.world_locations, pauli.missions and latest runtime model state; repair duplicate frontend realtime logic and reconcile the ThreeScene prop contract.
+reason: Pauli's World must render canonical backend truth and must not invent operational agent state when the control plane is unavailable.
+rollback_command: git revert <slice-merge-sha>
+risks:
+  - Production database must have the pauli control-plane migration and organization bootstrap applied before real agents appear.
+  - Legacy ICM scene envelopes remain a read-only event feed pending the canonical mission-event translation slice.
+next_action: Run CI and independent PR review; repair failures; then merge after explicit production approval.
+human_needed: true
