@@ -15,29 +15,23 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
+from config import SETTINGS
+from models.base import get_db
 from services import hermes
 from services.event_bus import publish, replay
 
 router = APIRouter()
 
-WORLD_ROSTER = [
-    ("pauli", "Pauli", "Executive agent"),
-    ("scout", "Scout", "Research"),
-    ("strategist", "Strategist", "Strategy"),
-    ("builder", "Builder", "Engineering"),
-    ("critic", "Critic", "Gauntlet"),
-    ("guardian", "Guardian", "Safety & policy"),
-    ("publisher", "Publisher", "Deployment"),
-    ("sales", "Sales", "Revenue"),
-]
-WORLD_POSITIONS = [
-    [0.0, 0.0, 0.0], [-3.8, 0.0, -1.5], [3.8, 0.0, -1.5], [-5.4, 0.0, 2.2],
-    [5.4, 0.0, 2.2], [-2.7, 0.0, 4.2], [2.7, 0.0, 4.2], [0.0, 0.0, 5.3],
-]
-WORLD_AGENT_IDS = {agent_id for agent_id, _, _ in WORLD_ROSTER}
+# Legacy ICM envelopes remain a read-only event feed until Mission Control emits
+# the canonical event translation contract. They are never used as authority for
+# live agent identity, presence, mission, model, or location state.
 PROFILE_TO_AGENT = {
     "executive": "pauli",
     "orchestrator": "pauli",
@@ -55,6 +49,16 @@ PROFILE_TO_AGENT = {
     "sales": "sales",
     "revenue": "sales",
 }
+DEFAULT_POSITIONS: list[list[float]] = [
+    [0.0, 0.0, 0.0],
+    [-3.8, 0.0, -1.5],
+    [3.8, 0.0, -1.5],
+    [-5.4, 0.0, 2.2],
+    [5.4, 0.0, 2.2],
+    [-2.7, 0.0, 4.2],
+    [2.7, 0.0, 4.2],
+    [0.0, 0.0, 5.3],
+]
 
 
 def _ops_root() -> Path:
@@ -96,13 +100,144 @@ def _recent_envelopes(limit: int) -> list[dict]:
 def _target_agent(env: dict) -> str | None:
     body = env.get("body") if isinstance(env.get("body"), dict) else {}
     explicit = str(body.get("target_avatar") or body.get("agent_id") or "").lower().strip()
-    if explicit in WORLD_AGENT_IDS:
+    if explicit:
         return explicit
 
     profile = str(env.get("worker_profile") or "").lower().strip()
-    if profile in WORLD_AGENT_IDS:
-        return profile
-    return PROFILE_TO_AGENT.get(profile)
+    if profile:
+        return PROFILE_TO_AGENT.get(profile, profile)
+    return None
+
+
+def _fallback_position(index: int) -> list[float]:
+    return DEFAULT_POSITIONS[index % len(DEFAULT_POSITIONS)]
+
+
+def _normalize_position(value: Any, index: int) -> list[float]:
+    if isinstance(value, (list, tuple)) and len(value) >= 3:
+        try:
+            return [float(value[0]), float(value[1]), float(value[2])]
+        except (TypeError, ValueError):
+            pass
+    if isinstance(value, dict):
+        try:
+            if all(axis in value for axis in ("x", "y", "z")):
+                return [float(value["x"]), float(value["y"]), float(value["z"])]
+        except (TypeError, ValueError):
+            pass
+    return _fallback_position(index)
+
+
+def _avatar_from_row(row: dict[str, Any], index: int) -> dict[str, Any]:
+    state = str(row.get("presence_state") or row.get("agent_status") or "offline")
+    last_event_at = row.get("presence_updated_at") or row.get("last_heartbeat_at")
+    if last_event_at is not None and not isinstance(last_event_at, str):
+        last_event_at = last_event_at.isoformat()
+
+    return {
+        # Stable world identity is agent_key. Database UUID remains available for
+        # inspection but must not become the visual identity contract.
+        "id": str(row.get("agent_key") or row.get("database_id") or "unknown"),
+        "database_id": row.get("database_id"),
+        "name": str(row.get("name") or row.get("agent_key") or "Agent"),
+        "role": str(row.get("role") or "Agent"),
+        "position": _normalize_position(row.get("position"), index),
+        "model": str(row.get("model_key") or "unassigned"),
+        "state": state,
+        "activity_summary": row.get("activity_summary"),
+        "last_event_at": last_event_at,
+        "location": {
+            "key": row.get("location_key") or row.get("world_location_key"),
+            "name": row.get("location_name"),
+        },
+        "mission": {
+            "id": row.get("mission_id"),
+            "title": row.get("mission_title"),
+            "status": row.get("mission_status"),
+        } if row.get("mission_id") else None,
+    }
+
+
+def _canonical_lounge_state(db: Session, organization_slug: str) -> dict[str, Any] | None:
+    """Return the authoritative world projection, or None when not bootstrapped.
+
+    This function never manufactures operational rows. When the `pauli` schema or
+    requested organization is absent, callers receive an explicit empty/degraded
+    world state instead of a synthetic roster.
+    """
+    schema_ready = bool(db.execute(text("select to_regnamespace(:schema) is not null"), {"schema": SETTINGS.pauli_db_schema}).scalar())
+    if not schema_ready:
+        return None
+
+    organization = db.execute(
+        text("select id::text, name from pauli.organizations where slug=:slug and status='active' limit 1"),
+        {"slug": organization_slug},
+    ).mappings().first()
+    if not organization:
+        return None
+
+    org_id = organization["id"]
+    rows = db.execute(text("""
+        select
+          a.id::text as database_id,
+          a.agent_key,
+          a.name,
+          a.role,
+          a.status as agent_status,
+          a.world_location_key,
+          a.last_heartbeat_at,
+          wp.state as presence_state,
+          wp.position,
+          wp.activity_summary,
+          wp.updated_at as presence_updated_at,
+          wl.location_key,
+          wl.name as location_name,
+          m.id::text as mission_id,
+          m.title as mission_title,
+          m.status as mission_status,
+          latest_run.model_key
+        from pauli.agents a
+        left join pauli.world_presence wp
+          on wp.organization_id=a.organization_id and wp.agent_id=a.id
+        left join pauli.world_locations wl on wl.id=wp.location_id
+        left join pauli.missions m on m.id=wp.mission_id
+        left join lateral (
+          select rr.model_key
+          from pauli.runtime_runs rr
+          where rr.organization_id=a.organization_id and rr.agent_id=a.id
+          order by rr.created_at desc
+          limit 1
+        ) latest_run on true
+        where a.organization_id=cast(:org_id as uuid)
+        order by case when a.agent_key='pauli' then 0 else 1 end, a.name
+    """), {"org_id": org_id}).mappings().all()
+
+    counts = db.execute(text("""
+        select
+          (select count(*) from pauli.missions
+             where organization_id=cast(:org_id as uuid)
+               and status not in ('CLOSED','FAILED','CANCELLED')) as active_missions,
+          (select count(*) from pauli.approvals
+             where organization_id=cast(:org_id as uuid) and status='pending') as approvals_pending,
+          (select count(*) from pauli.evidence_receipts
+             where organization_id=cast(:org_id as uuid) and status='verified') as verified_evidence
+    """), {"org_id": org_id}).mappings().one()
+
+    avatars = [_avatar_from_row(dict(row), index) for index, row in enumerate(rows)]
+    return {
+        "lounge": "Pauli's Place",
+        "setting": f"{organization['name']} · canonical operational state",
+        "avatars": avatars,
+        "schedule_cue": (
+            f"{len(avatars)} agents · {counts['active_missions']} active missions · "
+            f"{counts['approvals_pending']} approvals pending"
+        ),
+        "counts": dict(counts),
+        "organization_slug": organization_slug,
+        "source": "pauli.control_plane",
+        "status": "ready",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 @router.get("/healthz")
@@ -141,51 +276,41 @@ async def envelope_replay(event_id: str):
 
 @router.get("/api/lounge/scenes")
 def lounge_scenes(limit: int = Query(20, ge=1, le=100)):
-    """Return only persisted event envelopes, newest event timestamp first."""
-    return {"scenes": _recent_envelopes(limit)}
+    """Legacy read-only event feed; operational state authority is the pauli schema."""
+    return {"scenes": _recent_envelopes(limit), "source": "icm/memory/ops:legacy-feed"}
 
 
 @router.get("/api/lounge/state")
-def lounge_state():
-    """Project configured identities plus activity inferred only from persisted events."""
-    recent = _recent_envelopes(50)
-    latest_by_agent: dict[str, dict] = {}
-    for env in recent:
-        agent_id = _target_agent(env)
-        if agent_id and agent_id not in latest_by_agent:
-            latest_by_agent[agent_id] = env
+def lounge_state(
+    organization_slug: str = SETTINGS.pauli_default_org_slug,
+    db: Session = Depends(get_db),
+):
+    """Project canonical tenant-scoped control-plane state into Pauli's World."""
+    try:
+        state = _canonical_lounge_state(db, organization_slug)
+    except SQLAlchemyError as exc:
+        return {
+            "lounge": "Pauli's Place",
+            "setting": "Operational world · canonical control plane unavailable",
+            "avatars": [],
+            "schedule_cue": "Control-plane database unavailable",
+            "organization_slug": organization_slug,
+            "source": "pauli.control_plane",
+            "status": "database_degraded",
+            "error": type(exc).__name__,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }
 
-    avatars = []
-    for index, (agent_id, name, role) in enumerate(WORLD_ROSTER):
-        env = latest_by_agent.get(agent_id)
-        state = "idle"
-        model = "unassigned"
-        activity_summary = None
-        last_event_at = None
-        if env:
-            stage = str(env.get("stage") or "").upper()
-            state = "blocked" if stage == "HALT" or env.get("halt") else "working"
-            model = str(env.get("worker_model") or "unassigned")
-            body = env.get("body") if isinstance(env.get("body"), dict) else {}
-            activity_summary = body.get("public_summary") or body.get("response_text") or body.get("lounge_scene_intent")
-            last_event_at = env.get("ts")
-
-        avatars.append({
-            "id": agent_id,
-            "name": name,
-            "role": role,
-            "position": WORLD_POSITIONS[index],
-            "model": model,
-            "state": state,
-            "activity_summary": activity_summary,
-            "last_event_at": last_event_at,
-        })
+    if state is not None:
+        return state
 
     return {
         "lounge": "Pauli's Place",
-        "setting": "Operational world · persisted event state",
-        "avatars": avatars,
-        "schedule_cue": f"{len(recent)} verified events available" if recent else "No verified events yet",
-        "source": "icm/memory/ops",
+        "setting": "Operational world · canonical control plane not bootstrapped",
+        "avatars": [],
+        "schedule_cue": "No canonical world state available",
+        "organization_slug": organization_slug,
+        "source": "pauli.control_plane",
+        "status": "needs_database_migration_or_bootstrap",
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
