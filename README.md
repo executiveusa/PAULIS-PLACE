@@ -165,6 +165,21 @@ Rules for this path:
 - Production deployment is a distinct `software.production.deploy` action and requires canonical human approval after a verified preview.
 - Owner-facing completion should present outcome and evidence first; branch, commit, command, and runtime traces remain drill-down detail.
 
+## Governed digital product factory
+
+Digital-product missions reuse the existing Designer and Publisher ICM roles, with `backend/services/digital_product_factory.py` as the durable package/evidence authority and `pauli.digital_product_operations` / `pauli.digital_product_receipts` as the ledger.
+
+Rules for this path:
+
+- Audience, problem, offer, product type, and acceptance criteria are persisted before generation.
+- Research provenance is mandatory; each research claim requires a source and retrieval timestamp before artifact completion.
+- Real artifact metadata is recorded and hashed before packaging.
+- Sell-ready package manifests require a version, format, title, and at least one non-empty file with SHA-256 identity and byte size.
+- Objective quality checks, independent critic evidence, and Guardian evidence must all pass; failures return the operation to repair.
+- Listing/delivery drafts are capability-gated and replay-safe through a persisted distribution draft ID.
+- Public sale activation is a distinct `digital.publish.activate` action and requires canonical human approval.
+- Designer and Publisher do not become alternate approval authorities; the control plane retains mission, evidence, budget, and approval authority.
+
 ## Deployment direction
 
 - **Vercel** — mobile/web frontend and previews.
