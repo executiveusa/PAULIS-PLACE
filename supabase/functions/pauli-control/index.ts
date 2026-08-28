@@ -43,16 +43,49 @@ async function overview(orgId: string) {
       (select count(*)::int from pauli.missions where organization_id=${orgId}::uuid and status not in ('CLOSED','CANCELLED','FAILED')) active_missions,
       (select count(*)::int from pauli.agents where organization_id=${orgId}::uuid and status in ('working','meeting','recovering')) agents_working,
       (select count(*)::int from pauli.approvals where organization_id=${orgId}::uuid and status='pending') approvals_pending,
-      (select count(*)::int from pauli.incidents where organization_id=${orgId}::uuid and status <> 'resolved') open_incidents,
-      (select coalesce(sum(case when entry_type='revenue' then amount_cents else 0 end),0)::bigint from pauli.treasury_entries where organization_id=${orgId}::uuid and occurred_at >= date_trunc('day',now())) revenue_today_cents,
-      (select coalesce(sum(case when entry_type in ('expense','fee') then amount_cents else 0 end),0)::bigint from pauli.treasury_entries where organization_id=${orgId}::uuid and occurred_at >= date_trunc('day',now())) spend_today_cents
+      (select count(*)::int from pauli.incidents where organization_id=${orgId}::uuid and status <> 'resolved') open_incidents
   `)[0];
+
+  const ownerBriefRows = await sql`
+    select b.id,b.brief_hash,b.outcome,b.decisions,b.evidence,b.needs_you,b.working_now,b.created_at,
+           s.coverage_status,s.as_of,s.provenance,s.source_hash
+    from pauli.owner_briefs b
+    join pauli.business_metric_snapshots s on s.id=b.snapshot_id
+    where b.organization_id=${orgId}::uuid
+    order by b.created_at desc
+    limit 1
+  `;
+  const ownerBrief = ownerBriefRows[0] ?? {
+    outcome: {
+      coverage_status: "missing",
+      revenue_cents: null,
+      cost_cents: null,
+      profit_cents: null,
+      pod_published: 0,
+      digital_sell_ready: 0,
+      software_preview_ready: 0,
+    },
+    decisions: [{
+      priority: 100,
+      action: "reconcile_business_metrics",
+      reason: "No source-qualified owner brief has been recorded yet. Financial results are unknown, not zero.",
+      evidence: [],
+    }],
+    evidence: [],
+    needs_you: [],
+    working_now: [],
+    coverage_status: "missing",
+    as_of: null,
+    provenance: [],
+    source_hash: null,
+  };
+
   const missions = await sql`select id,title,status,mission_type,priority,requested_outcome,created_at from pauli.missions where organization_id=${orgId}::uuid order by created_at desc limit 8`;
   const agents = await sql`select id,agent_key,name,role,specialty,status,world_location_key,last_heartbeat_at from pauli.agents where organization_id=${orgId}::uuid order by case when agent_key='pauli' then 0 else 1 end,name limit 24`;
   const approvals = await sql`select id,mission_id,action_class,risk_class,scope,max_spend_cents,status,expires_at,created_at from pauli.approvals where organization_id=${orgId}::uuid and status='pending' order by created_at limit 8`;
   const providers = await sql`select provider_key,name,kind,capabilities,health_status,last_healthcheck_at from pauli.runtime_providers order by kind,name`;
   const incidents = await sql`select id,severity,incident_type,title,summary,status,detected_at from pauli.incidents where organization_id=${orgId}::uuid and status <> 'resolved' order by detected_at desc limit 5`;
-  return { ...metrics, missions, agents, approvals, providers, incidents };
+  return { ...metrics, owner_brief: ownerBrief, missions, agents, approvals, providers, incidents };
 }
 
 Deno.serve(async (req) => {
