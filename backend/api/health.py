@@ -225,7 +225,11 @@ def lounge_scenes(limit: int = Query(20, ge=1, le=100)):
 
 
 @router.get("/api/lounge/state")
-def lounge_state(organization_slug: str = SETTINGS.pauli_default_org_slug, db: Session = Depends(get_db)):
+def lounge_state(db: Session = Depends(get_db)):
+    # This owner-cockpit route is intentionally pinned to the server-configured
+    # tenant until an authenticated tenant resolver is wired. Never accept a
+    # caller-supplied organization slug here: backend DB sessions may bypass RLS.
+    organization_slug = SETTINGS.pauli_default_org_slug
     try:
         state = _canonical_lounge_state(db, organization_slug)
     except SQLAlchemyError as exc:
