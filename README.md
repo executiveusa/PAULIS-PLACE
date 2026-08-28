@@ -54,6 +54,7 @@ Owner-facing rules:
 - Provider health, raw task state, branches, commits, logs, and runtime traces remain available as drill-down rather than dominating Home.
 - Failure copy is plain-language and explicit about what did not happen, whether money was spent, and what Pauli is doing next.
 - Mobile navigation is first-class: **Home | Pauli | Work | World**.
+- The final visual system uses an editorial light owner canvas, a dark Pauli command stage, a recognizable Pauli orb, restrained ambient depth, state-driven motion only, and `prefers-reduced-motion` fallbacks.
 
 ## Composio integration
 
