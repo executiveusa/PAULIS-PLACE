@@ -180,6 +180,21 @@ Rules for this path:
 - Public sale activation is a distinct `digital.publish.activate` action and requires canonical human approval.
 - Designer and Publisher do not become alternate approval authorities; the control plane retains mission, evidence, budget, and approval authority.
 
+## Business intelligence and owner brief
+
+The owner outcome layer uses `backend/services/business_intelligence.py` and source-qualified snapshots in `pauli.business_metric_snapshots` / `pauli.owner_briefs`.
+
+Rules for this layer:
+
+- Tenant-scoped money is read from `pauli.economic_events`; the older `yappy_ledger` is not used directly for owner totals because it lacks `organization_id` isolation.
+- Missing financial coverage returns unknown revenue/cost/profit values, never fabricated zeros.
+- Stale financial coverage is labeled stale and suppresses scaling recommendations until refreshed.
+- Profit is computed deterministically as revenue minus costs, fees, and refunds; payouts are tracked separately rather than double-counted as expense.
+- POD, software, and digital-product states come from their governed operation ledgers, while approvals and workforce state come from canonical control-plane tables.
+- Every persisted snapshot carries provenance, coverage status, an as-of timestamp, and a deterministic source hash.
+- Watcher-style recommendations cite the metric keys that justify each decision.
+- The owner brief follows **Outcome → Decision → Evidence → Needs You / Working Now**, with technical traces as drill-down detail.
+
 ## Deployment direction
 
 - **Vercel** — mobile/web frontend and previews.
