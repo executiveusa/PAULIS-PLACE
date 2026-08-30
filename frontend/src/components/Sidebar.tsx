@@ -42,6 +42,10 @@ const primary = [
 export function Sidebar() {
   const pathname = usePathname();
 
+  // The owner Home owns its own calm four-surface navigation. Technical chrome
+  // only appears after the owner deliberately drills into an operator route.
+  if (pathname === '/') return null;
+
   return (
     <>
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-white/10 bg-[#0b0b0b] lg:flex">
@@ -65,7 +69,7 @@ export function Sidebar() {
                 key={`${item.href}-${item.label}`}
                 href={item.href}
                 className={clsx(
-                  'flex items-center gap-3 px-4 py-3 text-sm transition-colors',
+                  'flex items-center gap-3 px-4 py-3 text-sm transition-colors active:scale-[0.985]',
                   isActive
                     ? 'bg-white/[0.05] text-stone-100'
                     : 'text-stone-500 hover:bg-white/[0.03] hover:text-stone-200'
@@ -98,7 +102,7 @@ export function Sidebar() {
                 key={item.href}
                 href={item.href}
                 className={clsx(
-                  'flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[9px] font-medium transition',
+                  'flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[9px] font-medium transition active:scale-[0.96]',
                   active ? 'bg-white/[0.07] text-stone-100' : 'text-stone-600'
                 )}
               >
