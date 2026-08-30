@@ -6,6 +6,13 @@ import { Activity, ArrowRight, Check, Clock3, MapPin, ShieldAlert, Sparkles, X }
 import { useEffect } from 'react';
 import type { PauliAgentSummary } from '@/lib/pauliControl';
 
+// Framer Motion 10 predates React 19's JSX type changes. Runtime behavior is
+// compatible, but its intrinsic-element typings lose DOM props under React 19.
+// Keep the existing, already-shipped runtime and bridge only these three nodes.
+const MotionDiv = motion.div as any;
+const MotionButton = motion.button as any;
+const MotionSection = motion.section as any;
+
 export type FeedbackTone = 'neutral' | 'success' | 'warning' | 'error';
 
 export interface PremiumFeedback {
@@ -37,7 +44,7 @@ export function FeedbackStack({ items, onDismiss }: { items: PremiumFeedback[]; 
         {items.slice(-3).map((item) => {
           const Icon = toneIcon[item.tone];
           return (
-            <motion.div
+            <MotionDiv
               key={item.id}
               layout
               initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -10, scale: 0.97 }}
@@ -66,7 +73,7 @@ export function FeedbackStack({ items, onDismiss }: { items: PremiumFeedback[]; 
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
-            </motion.div>
+            </MotionDiv>
           );
         })}
       </AnimatePresence>
@@ -97,7 +104,7 @@ export function AgentDetailSheet({ agent, onClose }: { agent: PauliAgentSummary 
     <AnimatePresence>
       {agent && (
         <div className="fixed inset-0 z-[80] flex items-end justify-center md:items-center md:justify-end" role="dialog" aria-modal="true" aria-label={`${agent.name} agent details`}>
-          <motion.button
+          <MotionButton
             type="button"
             aria-label="Close agent details"
             className="absolute inset-0 bg-black/24 backdrop-blur-[2px]"
@@ -107,11 +114,11 @@ export function AgentDetailSheet({ agent, onClose }: { agent: PauliAgentSummary 
             exit={{ opacity: 0 }}
             transition={{ duration: reduceMotion ? 0.1 : 0.18 }}
           />
-          <motion.section
+          <MotionSection
             drag={reduceMotion ? false : 'y'}
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0, bottom: 0.22 }}
-            onDragEnd={(_, info) => {
+            onDragEnd={(_: unknown, info: { offset: { y: number }; velocity: { y: number } }) => {
               if (info.offset.y > 110 || info.velocity.y > 700) onClose();
             }}
             initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 44, scale: 0.985 }}
@@ -149,7 +156,7 @@ export function AgentDetailSheet({ agent, onClose }: { agent: PauliAgentSummary 
                 Open workforce control <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
-          </motion.section>
+          </MotionSection>
         </div>
       )}
     </AnimatePresence>
