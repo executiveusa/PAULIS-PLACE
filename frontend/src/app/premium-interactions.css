@@ -1,0 +1,74 @@
+.pressable {
+  -webkit-tap-highlight-color: transparent;
+  transform: translateZ(0);
+  transition: transform 120ms ease-out, background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 180ms ease;
+}
+
+.pressable:active {
+  transform: scale(.975);
+  transition-duration: 80ms;
+}
+
+.agent-row {
+  transition: background-color 160ms ease, padding 160ms ease, transform 100ms ease-out;
+}
+
+.agent-row:hover {
+  background: rgba(255,255,255,.56);
+  padding-left: .55rem;
+  padding-right: .55rem;
+}
+
+.owner-topbar {
+  border-bottom: 0 !important;
+  box-shadow: 0 1px 0 rgba(23,23,20,.04), 0 12px 28px rgba(23,23,20,.025);
+}
+
+.owner-topbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -12px;
+  height: 12px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(243,240,234,.34), transparent);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .owner-topbar,
+  .owner-card,
+  [class*="backdrop-blur"] {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .owner-topbar { background: #f3f0ea !important; }
+  .owner-card { background: #fff !important; }
+}
+
+@media (prefers-contrast: more) {
+  .owner-card,
+  .owner-topbar,
+  .agent-row,
+  button,
+  a {
+    border-color: rgba(23,23,20,.24) !important;
+  }
+
+  .owner-shell { background: #f3f0ea !important; }
+  .text-black\/40,
+  .text-black\/45,
+  .text-black\/48,
+  .text-black\/50,
+  .text-black\/52 {
+    color: rgba(23,23,20,.78) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pressable:active,
+  .agent-row:hover {
+    transform: none !important;
+  }
+}
