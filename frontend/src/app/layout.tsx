@@ -1,4 +1,5 @@
 import './globals.css';
+import './premium-interactions.css';
 import { Sidebar } from '@/components/Sidebar';
 
 export const metadata = {
