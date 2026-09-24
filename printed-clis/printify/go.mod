@@ -5,12 +5,12 @@ go 1.26.5
 require (
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/spf13/cobra v1.10.2
-	github.com/spf13/pflag v1.0.9
+	github.com/spf13/pflag v1.0.10
 )
 
-require modernc.org/sqlite v1.58.0
+require modernc.org/sqlite v1.59.0
 
-require github.com/mark3labs/mcp-go v1.0.0
+require github.com/mark3labs/mcp-go v1.1.0
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -24,7 +24,7 @@ require (
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	modernc.org/libc v1.75.6 // indirect
+	modernc.org/libc v1.75.7 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
 )
@@ -38,4 +38,4 @@ require (
 // behind `//go:build windows`, so running `go mod tidy` under GOOS=linux/darwin
 // re-marks this // indirect (that GOOS compiles no file that imports it); under
 // GOOS=windows it stays direct. That is tolerated churn, NOT a bug to "fix".
-require golang.org/x/sys v0.47.0
+require golang.org/x/sys v0.48.0
